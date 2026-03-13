@@ -1,0 +1,33 @@
+{
+  "session_id": "persist_test_002",
+  "turns": [
+    {
+      "turn_index": 1,
+      "question_id": "Q_STD_01",
+      "question_text": "Please introduce yourself and summarize your professional background.",
+      "user_answer": "First persisted answer for restart test.",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:27:46Z"
+    },
+    {
+      "turn_index": 2,
+      "question_id": "Q_STD_01",
+      "question_text": "Please introduce yourself and provide a brief overview of your professional background.",
+      "user_answer": "Second persisted answer for restart test.",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:27:48Z"
+    }
+  ]
+}

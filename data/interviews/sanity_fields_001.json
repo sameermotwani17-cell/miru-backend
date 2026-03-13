@@ -1,0 +1,21 @@
+{
+  "session_id": "sanity_fields_001",
+  "turns": [
+    {
+      "turn_index": 1,
+      "question_id": "Q_STD_01",
+      "question_category": "intro",
+      "question_prompt": "Please introduce yourself.",
+      "user_answer": "sanity answer",
+      "answer": "sanity answer",
+      "scores": {
+        "jiko_pr": 1,
+        "shibou_douki": 1,
+        "kyouchousei": 1,
+        "seichou_iyoku": 1,
+        "bunka_tekigou": 1
+      },
+      "timestamp": "2026-03-13T15:46:00Z"
+    }
+  ]
+}

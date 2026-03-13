@@ -1,0 +1,381 @@
+MIRU - Detailed Company Profiles for AI Interview Simulation
+
+This document provides the detailed company profiles required for the
+MIRU AI interview agent. Each profile is structured to align with the
+MIRU Sid Research Brief, focusing on the cultural nuances, HR personas,
+and specific hiring criteria needed to simulate a realistic and
+culturally-aware Japanese job interview.
+
+1. Rakuten Group, Inc.
+
+ONE-LINE HIRING PERSONALITY: Aggressively global, data-driven, and
+meritocratic, seeking entrepreneurial-minded individuals who thrive on
+speed and measurable results.
+
+OFFICIAL HIRING CRITERIA (from their career page --- direct quote
+preferred): Rakuten Shugi, which comprises Brand Concepts and the
+Five Principles for Success, is the set of core principles that all
+employees of the Rakuten Group follow. We are looking for people who
+understand and can execute Rakuten Shugi.
+
+REAL INTERVIEW FOCUS (from Glassdoor and expat reports --- what
+actually happens): Interviews heavily test for alignment with the
+Five Principles for Success. Candidates are often asked to provide
+specific examples from their past that demonstrate these principles. The
+Englishnization policy is real; interviews are often conducted
+partially or fully in English, even for Japanese candidates. There's a
+strong emphasis on data and KPI-driven thinking. Expect questions about
+how you would measure success in a given role.
+
+CEO / FOUNDER PHILOSOPHY (that bleeds into hiring): Hiroshi
+Mikitani's philosophy, often summarized as Get Things Done, is
+central to Rakuten's culture. His book, Marketplace 3.0, is a major
+influence. The core idea is that success comes from a combination of
+hypothesis, practice, validation, and systematization (Shikumika).
+This scientific approach to business is a key part of the company's DNA
+and is reflected in the interview process.
+
+3 COMPANY-SPECIFIC INTERVIEW QUESTIONS:
+
+-   Q1: Describe a time you had to achieve a difficult goal with a
+    tight deadline. How did you apply the principle of 'Speed!! Speed!!
+    Speed!!' to succeed?
+
+    -   Why they ask it: To assess a candidate's ability to work
+        under pressure and their understanding of Rakuten's emphasis on
+        rapid execution.
+
+-   Q2: Imagine you are launching a new service. How would you use
+    the 'Hypothesize -> Practice -> Validate -> Shikumika' cycle to
+    ensure its success?
+
+    -   Why they ask it: To test for a data-driven and analytical
+        mindset, and to see if the candidate understands Rakuten's core
+        problem-solving methodology.
+
+-   Q3: Rakuten's mission is to empower people and society. How
+    does your personal career goal align with this mission?
+
+    -   Why they ask it: To gauge a candidate's long-term
+        commitment and cultural fit, and to see if they are motivated by
+        more than just salary.
+
+THE ONE THING THAT GETS YOU REJECTED HERE (specific to this
+company): Aversion to data and metrics. If a candidate cannot or will
+not quantify their achievements and speak in terms of KPIs, they will be
+seen as a poor fit for Rakuten's highly analytical culture.
+
+FOREIGNER NOTES (anything specific about how this company treats
+foreign applicants): Rakuten is one of the most foreigner-friendly
+large companies in Japan. The Englishnization policy makes it an
+attractive option for non-Japanese speakers. However, the company still
+expects a high level of professionalism and a deep understanding of its
+corporate philosophy. Foreigners are not exempt from knowing and
+embodying Rakuten Shugi.
+
+SOURCES USED:
+
+-   <https://global.rakuten.com/corp/about/philosophy/principle/>
+
+-   <https://www.glassdoor.com/Interview/Rakuten-Interview-Questions-E40197.htm>
+
+2. Toyota Motor Corporation
+
+ONE-LINE HIRING PERSONALITY: Traditional, methodical, and deeply
+committed to long-term improvement, seeking humble team players who
+respect the process.
+
+OFFICIAL HIRING CRITERIA (from their career page --- direct quote
+preferred): The Toyota Way is supported by two main pillars:
+'Continuous Improvement' and 'Respect for People'. We are never
+satisfied with where we are and always work to improve our business by
+putting forward new ideas and working to the best of our abilities. We
+respect all Toyota stakeholders, and believe the success of our business
+is created by individual effort and good teamwork.
+
+REAL INTERVIEW FOCUS (from Glassdoor and expat reports --- what
+actually happens): Interviews are highly structured and focus on a
+candidate's thought process. The concept of Genchi Genbutsu (go and
+see for yourself) is frequently tested through hypothetical
+problem-solving scenarios. Interviewers are less interested in flashy
+achievements and more interested in a candidate's ability to identify
+root causes and propose incremental, sustainable improvements. Loyalty
+and a desire for long-term employment are heavily screened for.
+
+CEO / FOUNDER PHILOSOPHY (that bleeds into hiring): The principles
+of the Toyota Production System (TPS), developed by Taiichi Ohno and
+Eiji Toyoda, are the foundation of the company's culture. The Toyota
+Way 2001 is a formalization of these principles. The core idea is the
+complete elimination of waste and a deep respect for people. This
+philosophy is so ingrained that it's not just a business strategy;
+it's a way of life at Toyota.
+
+3 COMPANY-SPECIFIC INTERVIEW QUESTIONS:
+
+-   Q1: Imagine you are a line manager and your team is
+    consistently failing to meet its production targets. How would you
+    apply the principle of 'Genchi Genbutsu' to identify and solve the
+    problem?
+
+    -   Why they ask it: To assess a candidate's problem-solving
+        methodology and their understanding of Toyota's hands-on,
+        evidence-based approach.
+
+-   Q2: Describe a time you made a mistake at work. What was the
+    mistake, and what steps did you take to ensure it would not happen
+    again?
+
+    -   Why they ask it: To evaluate a candidate's commitment to
+        continuous improvement (Kaizen) and their willingness to take
+        responsibility for their actions.
+
+-   Q3: Why do you want to work for Toyota, and where do you see
+    yourself in our company in 10 years?
+
+    -   Why they ask it: To screen for long-term commitment
+        (Chuuseishin) and to see if the candidate's career goals align
+        with Toyota's focus on internal development and lifetime
+        employment.
+
+THE ONE THING THAT GETS YOU REJECTED HERE (specific to this
+company): Appearing to be a job-hopper or expressing a desire for
+rapid, individual promotion. Toyota values loyalty and team-oriented
+career growth above all else.
+
+FOREIGNER NOTES (anything specific about how this company treats
+foreign applicants): Toyota is a traditional Japanese company, and
+while it has a global presence, its headquarters in Japan can be
+challenging for foreigners to integrate into. A high level of Japanese
+language proficiency is often required, and a deep respect for Japanese
+business etiquette is essential. Foreigners who demonstrate a genuine
+interest in and understanding of the Toyota Way will have a significant
+advantage.
+
+SOURCES USED:
+
+-   <https://www.toyota-global.com/company/history_of_toyota/75years/data/conditions/philosophy/toyotaway2001.html>
+
+-   <https://www.glassdoor.com/Interview/Toyota-Motor-Corporation-Interview-Questions-E3534.htm>
+
+3. Sony Group Corporation
+
+ONE-LINE HIRING PERSONALITY: A unique blend of creative artistry and
+disciplined engineering, seeking innovators who can dream and execute
+with precision.
+
+OFFICIAL HIRING CRITERIA (from their career page --- direct quote
+preferred): Fill the world with emotion, through the power of
+creativity and technology. To be a part of Sony is to be a part of a
+collective of people who are relentlessly curious and creative, and who
+know that we can make a difference in the world by bringing our ideas to
+life.
+
+REAL INTERVIEW FOCUS (from Glassdoor and expat reports --- what
+actually happens): Interviews at Sony often explore a candidate's
+passion for the company's products and services. Expect questions about
+your favorite Sony product and how you would improve it. There is a
+strong emphasis on both creativity and technical knowledge. Candidates
+are often asked to demonstrate their ability to think outside the box
+while also showing a deep understanding of their field. The interview
+process can be quite formal and traditional, despite the company's
+creative image.
+
+CEO / FOUNDER PHILOSOPHY (that bleeds into hiring): Sony's culture
+is heavily influenced by its founders, Masaru Ibuka and Akio Morita.
+Their philosophy of doing what has never been done before is still a
+core part of the company's identity. The current leadership continues
+to emphasize the importance of Kando (emotional involvement) and the
+fusion of creativity and technology. This means they are looking for
+people who are not just skilled, but also passionate about creating new
+and exciting experiences.
+
+3 COMPANY-SPECIFIC INTERVIEW QUESTIONS:
+
+-   Q1: What is your favorite Sony product, and what is one
+    improvement you would make to it?
+
+    -   Why they ask it: To assess a candidate's passion for
+        Sony's products and their ability to think critically and
+        creatively about product development.
+
+-   Q2: Describe a project where you had to combine your creative
+    and technical skills to solve a problem.
+
+    -   Why they ask it: To evaluate a candidate's ability to
+        bridge the gap between creativity and technology, a core value
+        at Sony.
+
+-   Q3: Sony's purpose is to 'fill the world with emotion.' How
+    can you contribute to this purpose in the role you are applying
+    for?
+
+    -   Why they ask it: To gauge a candidate's understanding of
+        Sony's corporate philosophy and their ability to connect their
+        personal goals with the company's mission.
+
+THE ONE THING THAT GETS YOU REJECTED HERE (specific to this
+company): Lack of passion for Sony's products and mission. If a
+candidate seems indifferent to the company's work or unable to
+articulate why they want to work for Sony specifically, they will be
+seen as a poor cultural fit.
+
+FOREIGNER NOTES (anything specific about how this company treats
+foreign applicants): Sony has a global presence and is generally open
+to hiring foreigners, especially those with specialized technical
+skills. However, for positions at the Tokyo headquarters, a high level
+of Japanese language proficiency is often required. Foreigners who can
+demonstrate a deep appreciation for Japanese culture and Sony's unique
+history will have an advantage.
+
+SOURCES USED:
+
+-   <https://www.sony.com/en/SonyInfo/CorporateInfo/purpose_and_values/>
+
+-   <https://www.glassdoor.com/Interview/Sony-Interview-Questions-E294.htm>
+
+4. SoftBank Group Corp.
+
+ONE-LINE HIRING PERSONALITY: A highly aggressive and ambitious
+investment group, looking for visionary thinkers who are comfortable
+with risk and driven by a desire to be number one.
+
+OFFICIAL HIRING CRITERIA (from their career page --- direct quote
+preferred): The SoftBank Group is a corporate group that will
+continue to grow for 300 years. We are looking for people who share our
+vision and are willing to take on challenges.
+
+REAL INTERVIEW FOCUS (from Glassdoor and expat reports --- what
+actually happens): Interviews are fast-paced and challenging, with a
+strong focus on a candidate's ambition and ability to think
+strategically. Expect to be asked about your long-term goals and how
+they align with SoftBank's 300-year vision. The concept of Reverse
+Planning is often tested, where candidates are asked to start with a
+bold goal and work backward to create a plan. There is a heavy emphasis
+on financial and analytical skills, even for non-finance roles.
+
+CEO / FOUNDER PHILOSOPHY (that bleeds into hiring): Masayoshi Son's
+audacious and often controversial leadership style is the driving force
+behind SoftBank's culture. His philosophy is centered on the
+Information Revolution and the idea that technology can solve
+humanity's greatest challenges. He is known for his long-term vision
+and his willingness to make huge bets on unproven technologies. This
+philosophy attracts a certain type of employee: one who is not afraid of
+failure and is motivated by the opportunity to change the world.
+
+3 COMPANY-SPECIFIC INTERVIEW QUESTIONS:
+
+-   Q1: What is your personal 30-year plan? How does it align with
+    SoftBank's 300-year vision?
+
+    -   Why they ask it: To assess a candidate's long-term thinking
+        and ambition, and to see if they are a good fit for SoftBank's
+        visionary culture.
+
+-   Q2: If you were given a $100 million investment, what
+    technology or company would you invest in and why?
+
+    -   Why they ask it: To evaluate a candidate's strategic
+        thinking, risk tolerance, and understanding of emerging
+        technologies.
+
+-   Q3: Describe a time you failed. What did you learn from the
+    experience, and how did it make you stronger?
+
+    -   Why they ask it: To gauge a candidate's resilience and
+        their ability to learn from their mistakes, a key trait for
+        success in SoftBank's high-stakes environment.
+
+THE ONE THING THAT GETS YOU REJECTED HERE (specific to this
+company): Thinking too small. SoftBank is looking for people who are
+not afraid to dream big and take on massive challenges. Candidates who
+are too conservative or risk-averse will not be a good fit for the
+company's culture.
+
+FOREIGNER NOTES (anything specific about how this company treats
+foreign applicants): SoftBank is a global company with a diverse
+workforce. However, the company's leadership is predominantly Japanese,
+and a deep understanding of Japanese business culture is still
+important. Foreigners who can demonstrate a strong work ethic, a
+willingness to learn, and a passion for technology will be
+well-received.
+
+SOURCES USED:
+
+-   <https://group.softbank/en/philosophy/value>
+
+-   <https://www.glassdoor.com/Interview/SoftBank-Interview-Questions-E3816.htm>
+
+5. Fast Retailing Co., Ltd. (Uniqlo)
+
+ONE-LINE HIRING PERSONALITY: Customer-centric and globally
+ambitious, seeking adaptable individuals who embody the LifeWear
+philosophy and a strong sense of ownership.
+
+OFFICIAL HIRING CRITERIA (from their career page --- direct quote
+preferred): Changing clothes. Changing conventional wisdom. Change
+the world. We are looking for people who share our mission to create
+truly great clothing with new and unique value, bringing joy and
+satisfaction to people worldwide.
+
+REAL INTERVIEW FOCUS (from Glassdoor and expat reports --- what
+actually happens): Interviews often focus on a candidate's
+understanding of the LifeWear concept and their ability to embody
+it. Expect questions about customer service scenarios and how you would
+handle difficult situations. There's a strong emphasis on teamwork,
+adaptability, and a proactive approach to problem-solving. Candidates
+are often assessed on their potential to become future leaders and
+managers, even for entry-level positions, reflecting the Zen-in
+Keiei (Global One) philosophy.
+
+CEO / FOUNDER PHILOSOPHY (that bleeds into hiring): Tadashi Yanai,
+the founder and CEO of Fast Retailing, is known for his aggressive
+global expansion strategy and his belief in the power of clothing to
+change lives. His philosophy of Zen-in Keiei (Global One) encourages
+every employee to think and act like a business owner. He emphasizes
+speed, innovation, and a relentless focus on the customer. This
+translates into a hiring process that seeks individuals who are not just
+employees, but potential entrepreneurs within the company.
+
+3 COMPANY-SPECIFIC INTERVIEW QUESTIONS:
+
+-   Q1: Describe a time you went above and beyond to satisfy a
+    customer. What was the situation, and what was the outcome?
+
+    -   Why they ask it: To assess a candidate's customer-centric
+        mindset and their commitment to providing exceptional service, a
+        core value of Uniqlo.
+
+-   Q2: How do you interpret Uniqlo's 'LifeWear' philosophy,
+    and how do you think you can contribute to it in this role?
+
+    -   Why they ask it: To gauge a candidate's understanding of
+        the brand's core concept and their ability to align their
+        personal values with the company's mission.
+
+-   Q3: If you were a store manager, what is one innovative idea
+    you would implement to improve sales or customer experience?
+
+    -   Why they ask it: To evaluate a candidate's entrepreneurial
+        spirit, problem-solving skills, and potential for leadership
+        within the company.
+
+THE ONE THING THAT GETS YOU REJECTED HERE (specific to this
+company): Lack of initiative or a passive attitude. Uniqlo values
+employees who are proactive, take ownership of their work, and are
+constantly looking for ways to improve, rather than waiting to be told
+what to do.
+
+FOREIGNER NOTES (anything specific about how this company treats
+foreign applicants): Fast Retailing is actively expanding globally and
+seeks diverse talent. While Japanese language proficiency is highly
+valued, especially for customer-facing roles in Japan, there are also
+opportunities for non-Japanese speakers in various departments. Foreign
+applicants who demonstrate a strong understanding of the brand, a
+passion for retail, and a willingness to adapt to a fast-paced,
+demanding environment will be well-regarded.
+
+SOURCES USED:
+
+-   <https://www.fastretailing.com/eng/about/message/>
+
+-   <https://www.glassdoor.com/Interview/Fast-Retailing-Interview-Questions-E12005.htm>

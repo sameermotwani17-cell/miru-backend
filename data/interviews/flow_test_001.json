@@ -1,0 +1,95 @@
+{
+  "session_id": "flow_test_001",
+  "turns": [
+    {
+      "turn_index": 1,
+      "question_id": "Q_STD_01",
+      "question_prompt": "Please introduce yourself.",
+      "user_answer": "fake answer 1",
+      "answer": "fake answer 1",
+      "scores": {
+        "jiko_pr": 2,
+        "shibou_douki": 3,
+        "kyouchousei": 2,
+        "seichou_iyoku": 3,
+        "bunka_tekigou": 1
+      },
+      "timestamp": "2026-03-13T15:43:54Z"
+    },
+    {
+      "turn_index": 2,
+      "question_id": "Q_STD_02",
+      "question_prompt": "Why are you interested in working at this company?",
+      "user_answer": "fake answer 2",
+      "answer": "fake answer 2",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:43:56Z"
+    },
+    {
+      "turn_index": 3,
+      "question_id": "Q_BEHAVIOR_01",
+      "question_prompt": "Tell me about a time you faced a difficult challenge.",
+      "user_answer": "fake answer 3",
+      "answer": "fake answer 3",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:43:58Z"
+    },
+    {
+      "turn_index": 4,
+      "question_id": "Q_TEAM_01",
+      "question_prompt": "Describe a situation where you had to work closely with others.",
+      "user_answer": "fake answer 4",
+      "answer": "fake answer 4",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:43:59Z"
+    },
+    {
+      "turn_index": 5,
+      "question_id": "Q_FAILURE_01",
+      "question_prompt": "Tell me about a failure and what you learned from it.",
+      "user_answer": "fake answer 5",
+      "answer": "fake answer 5",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:44:01Z"
+    },
+    {
+      "turn_index": 6,
+      "question_id": "Q_CLOSING_01",
+      "question_prompt": "Do you have any final thoughts about why you would be a good fit?",
+      "user_answer": "fake answer 6",
+      "answer": "fake answer 6",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-13T15:44:03Z"
+    }
+  ]
+}
