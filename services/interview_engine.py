@@ -161,16 +161,41 @@ def run_interview_turn(
         "content": user_message
     })
 
+    prompt = f"""
+You are conducting a structured job interview.
+
+Candidate response:
+{user_message}
+
+You MUST ask the next interview question.
+
+Rules:
+- Ask ONE question only
+- No commentary
+- No "thank you"
+- No feedback
+- Continue the interview
+
+Next question:
+"""
+
     # Call LLM
     llm_response = call_llm(
         system_prompt=system_prompt,
         conversation=updated_conversation,
-        user_message=user_message,
+        user_message=prompt,
     )
 
     # -------- SAFE NORMALIZATION --------
 
+    # Keep question progression deterministic from the fixed registry.
     agent_text = str(question["prompt"])
+    model_text = str(llm_response.get("response") or "").strip()
+
+    # Hard safety guard: never let gratitude/chat text replace the next question.
+    if model_text.lower().startswith("thank"):
+        LOGGER.info("[INTERVIEW] Suppressed non-question LLM output; using registry question")
+        agent_text = str(question["prompt"])
 
     scores = _normalize_scores(llm_response.get("scores"))
 
