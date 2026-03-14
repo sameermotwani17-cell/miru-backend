@@ -9,9 +9,8 @@ class InterviewTurn:
     question_category: str
     question_prompt: str
     user_answer: str
-    jiko_pr: int
-    shibou_douki: int
-    kyouchousei: int
-    seichou_iyoku: int
-    bunka_tekigou: int
+    communication: int
+    clarity: int
+    cultural_fit: int
+    problem_solving: int
     timestamp: str

@@ -13,32 +13,27 @@ _API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 def _fallback_turn_feedback(turn_evaluations: List[Dict[str, Any]]) -> Dict[str, Any]:
-    feedback_items: List[Dict[str, str]] = []
-    for turn in turn_evaluations:
-        feedback_items.append(
-            {
-                "question_id": str(turn.get("question_id", "")),
-                "feedback": "Clear response with relevant intent.",
-                "improvement": "Add one concrete example with your personal action and outcome.",
-                "rewrite_example": "I collaborated closely with my team, aligned on goals, and reflected on feedback to improve results over time.",
-            }
-        )
-
+    feedback_items = [
+        {
+            "question_id": str(t.get("question_id", "")),
+            "feedback": "Clear response with relevant intent.",
+            "improvement": "Add one concrete example with your personal action and outcome.",
+            "rewrite_example": "I approached the challenge methodically, collaborated with my team, and reflected on the outcome to improve future performance.",
+        }
+        for t in turn_evaluations
+    ]
     return {"turn_feedback": feedback_items}
 
 
 def _fallback_final_report(overall_scores: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "overall_summary": "The interview shows a solid baseline with room to strengthen evidence depth and impact clarity.",
-        "strengths": [
-            "Collaborative communication",
-            "Positive growth orientation",
-        ],
+        "strengths": ["Clear communication", "Positive growth orientation"],
         "improvement_areas": [
             "Use more measurable outcomes",
-            "Show clearer long-term commitment signals",
+            "Demonstrate stronger problem-solving with concrete examples",
         ],
-        "recommended_focus": "Practice concise STAR examples that emphasize teamwork, humility, kaizen mindset, and sustained contribution.",
+        "recommended_focus": "Practice concise STAR examples that emphasize communication, clarity, and analytical thinking.",
         "overall_scores": dict(overall_scores),
     }
 
@@ -47,18 +42,18 @@ def generate_turn_feedback_batch(turn_evaluations: List[Dict[str, Any]]) -> Dict
     LOGGER.debug("[FEEDBACK] Generating batch turn feedback")
 
     if not _API_KEY:
-        LOGGER.warning("[FEEDBACK] OPENAI_API_KEY is missing; using fallback turn feedback")
         return _fallback_turn_feedback(turn_evaluations)
 
     client = OpenAI(api_key=_API_KEY)
 
     system_prompt = (
-        "You are MIRU, an AI interview coach helping candidates prepare for Japanese job interviews.\n"
+        "You are MIRU, an AI interview coach.\n"
         "For each interview answer provide:\n"
         "1. Feedback (what was good)\n"
         "2. One improvement suggestion\n"
         "3. A stronger rewritten version of the answer\n\n"
-        "The rewritten answer should emphasize teamwork, humility, learning mindset, and long-term commitment.\n"
+        "The rewritten answer should demonstrate clear communication, structured thinking, "
+        "cultural alignment, and problem-solving ability.\n"
         "Return ONLY JSON."
     )
 
@@ -75,7 +70,7 @@ def generate_turn_feedback_batch(turn_evaluations: List[Dict[str, Any]]) -> Dict
         "  ]\n"
         "}\n\n"
         "Interview answers and scores:\n"
-        f"{json.dumps(turn_evaluations, ensure_ascii=False)}"
+        + json.dumps(turn_evaluations, ensure_ascii=False)
     )
 
     try:
@@ -106,12 +101,7 @@ def generate_turn_feedback_batch(turn_evaluations: List[Dict[str, Any]]) -> Dict
                                         "improvement": {"type": "string"},
                                         "rewrite_example": {"type": "string"},
                                     },
-                                    "required": [
-                                        "question_id",
-                                        "feedback",
-                                        "improvement",
-                                        "rewrite_example",
-                                    ],
+                                    "required": ["question_id", "feedback", "improvement", "rewrite_example"],
                                 },
                             }
                         },
@@ -125,7 +115,6 @@ def generate_turn_feedback_batch(turn_evaluations: List[Dict[str, Any]]) -> Dict
         turn_feedback = parsed.get("turn_feedback", [])
         if not isinstance(turn_feedback, list):
             return _fallback_turn_feedback(turn_evaluations)
-
         return {"turn_feedback": turn_feedback}
     except Exception as exc:
         LOGGER.warning("[FEEDBACK] Batch turn feedback failed; using fallback. error=%s", exc)
@@ -136,7 +125,6 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
     LOGGER.debug("[FEEDBACK] Generating final report")
 
     if not _API_KEY:
-        LOGGER.warning("[FEEDBACK] OPENAI_API_KEY is missing; using fallback final report")
         return _fallback_final_report(overall_scores)
 
     client = OpenAI(api_key=_API_KEY)
@@ -148,18 +136,11 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
     )
 
     user_prompt = (
-        "Return JSON with:\n"
-        "{\n"
-        "  \"overall_summary\": \"...\",\n"
-        "  \"strengths\": [\"...\"],\n"
-        "  \"improvement_areas\": [\"...\"],\n"
-        "  \"recommended_focus\": \"...\",\n"
-        "  \"overall_scores\": {...}\n"
-        "}\n\n"
+        "Return JSON with overall_summary, strengths, improvement_areas, recommended_focus, overall_scores.\n\n"
         "Interview scores:\n"
-        f"{json.dumps(overall_scores, ensure_ascii=False)}\n\n"
-        "Key feedback:\n"
-        f"{json.dumps(turn_feedback, ensure_ascii=False)}"
+        + json.dumps(overall_scores, ensure_ascii=False)
+        + "\n\nKey feedback:\n"
+        + json.dumps(turn_feedback, ensure_ascii=False)
     )
 
     try:
@@ -187,19 +168,12 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
                                 "type": "object",
                                 "additionalProperties": False,
                                 "properties": {
-                                    "wa_teamwork": {"type": "number"},
-                                    "loyalty_commitment": {"type": "number"},
-                                    "humility": {"type": "number"},
-                                    "kaizen_growth": {"type": "number"},
-                                    "cultural_fit": {"type": "number"}
+                                    "communication": {"type": "number"},
+                                    "clarity": {"type": "number"},
+                                    "cultural_fit": {"type": "number"},
+                                    "problem_solving": {"type": "number"},
                                 },
-                                "required": [
-                                    "wa_teamwork",
-                                    "loyalty_commitment",
-                                    "humility",
-                                    "kaizen_growth",
-                                    "cultural_fit"
-                                ]
+                                "required": ["communication", "clarity", "cultural_fit", "problem_solving"],
                             },
                         },
                         "required": [

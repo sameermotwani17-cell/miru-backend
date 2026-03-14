@@ -9,22 +9,18 @@ from openai import OpenAI
 
 LOGGER = logging.getLogger(__name__)
 
-DEBUG_DEBRIEF = True
-
 EVALUATION_DIMENSIONS = [
-    "wa_teamwork",
-    "loyalty_commitment",
-    "humility",
-    "kaizen_growth",
+    "communication",
+    "clarity",
     "cultural_fit",
+    "problem_solving",
 ]
 
 _DEFAULT_EVALUATION: Dict[str, Any] = {
-    "wa_teamwork": 5,
-    "loyalty_commitment": 5,
-    "humility": 5,
-    "kaizen_growth": 5,
+    "communication": 5,
+    "clarity": 5,
     "cultural_fit": 5,
+    "problem_solving": 5,
     "notes": "Fallback scoring used due to evaluation parse failure.",
 }
 
@@ -61,8 +57,6 @@ def _normalize_evaluation(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def evaluate_answer(question_id: str, question_category: str, answer: str) -> Dict[str, Any]:
     LOGGER.debug("[DEBRIEF] Evaluating answer question_id=%s category=%s", question_id, question_category)
-    if DEBUG_DEBRIEF:
-        print("[DEBRIEF] Evaluating answer:", question_id)
 
     if not _API_KEY:
         LOGGER.warning("[DEBRIEF] OPENAI_API_KEY is missing; using fallback evaluation")
@@ -71,15 +65,13 @@ def evaluate_answer(question_id: str, question_category: str, answer: str) -> Di
     client = OpenAI(api_key=_API_KEY)
 
     system_prompt = (
-        "You are a Japanese HR interviewer evaluating a job candidate.\n"
-        "Score the candidate's answer according to Japanese hiring culture.\n\n"
-        "Evaluation categories:\n"
-        "1. Wa (teamwork harmony)\n"
-        "2. Loyalty (long-term commitment)\n"
-        "3. Humility\n"
-        "4. Kaizen (growth mindset)\n"
-        "5. Cultural Fit\n\n"
-        "Each score must be from 1 to 10.\n"
+        "You are an expert interviewer evaluating a job candidate's answer.\n"
+        "Score the answer on four dimensions:\n"
+        "1. communication — clarity and confidence of expression\n"
+        "2. clarity — structure and conciseness\n"
+        "3. cultural_fit — alignment with company values\n"
+        "4. problem_solving — analytical thinking and handling challenges\n\n"
+        "Each score must be 1 to 10. Be conservative — most answers should score 4-6.\n"
         "Return ONLY JSON."
     )
 
@@ -103,19 +95,17 @@ def evaluate_answer(question_id: str, question_category: str, answer: str) -> Di
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "wa_teamwork": {"type": "integer", "minimum": 1, "maximum": 10},
-                            "loyalty_commitment": {"type": "integer", "minimum": 1, "maximum": 10},
-                            "humility": {"type": "integer", "minimum": 1, "maximum": 10},
-                            "kaizen_growth": {"type": "integer", "minimum": 1, "maximum": 10},
+                            "communication": {"type": "integer", "minimum": 1, "maximum": 10},
+                            "clarity": {"type": "integer", "minimum": 1, "maximum": 10},
                             "cultural_fit": {"type": "integer", "minimum": 1, "maximum": 10},
+                            "problem_solving": {"type": "integer", "minimum": 1, "maximum": 10},
                             "notes": {"type": "string"},
                         },
                         "required": [
-                            "wa_teamwork",
-                            "loyalty_commitment",
-                            "humility",
-                            "kaizen_growth",
+                            "communication",
+                            "clarity",
                             "cultural_fit",
+                            "problem_solving",
                             "notes",
                         ],
                     },
@@ -125,18 +115,10 @@ def evaluate_answer(question_id: str, question_category: str, answer: str) -> Di
 
         raw_text = response.choices[0].message.content or "{}"
         parsed = json.loads(raw_text)
-        normalized = _normalize_evaluation(parsed)
+        return _normalize_evaluation(parsed)
     except Exception as exc:
         LOGGER.warning("[DEBRIEF] Evaluation failed; using fallback. error=%s", exc)
-        normalized = dict(_DEFAULT_EVALUATION)
-
-    LOGGER.debug(
-        "[DEBRIEF] Scores returned %s",
-        {dim: normalized[dim] for dim in EVALUATION_DIMENSIONS},
-    )
-    if DEBUG_DEBRIEF:
-        print("[DEBRIEF] Result:", {dim: normalized[dim] for dim in EVALUATION_DIMENSIONS})
-    return normalized
+        return dict(_DEFAULT_EVALUATION)
 
 
 def generate_interview_debrief(turns: List[Dict[str, Any]]) -> Dict[str, Any]:

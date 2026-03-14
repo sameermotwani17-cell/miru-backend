@@ -15,25 +15,24 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not session_id:
         raise HTTPException(status_code=422, detail="session_id is required")
 
-    # Backward compatibility: older clients still send user_answer.
-    user_message = payload.get("user_message")
-    if user_message is None:
-        user_message = payload.get("user_answer")
-    if user_message is None:
-        user_message = payload.get("answer")
-
+    # Accept user_answer or user_message
+    user_message = payload.get("user_answer") or payload.get("user_message") or payload.get("answer")
     user_message = str(user_message or "").strip()
     if not user_message:
-        raise HTTPException(status_code=422, detail="user_message is required")
+        raise HTTPException(status_code=422, detail="user_answer is required")
 
     session_state = get_session(session_id)
 
     language_mode = str(
-        payload.get("language_mode")
+        payload.get("language")
+        or payload.get("language_mode")
         or (session_state.language_mode if session_state else "en")
     )
 
-    company = str(payload.get("company") or (session_state.company if session_state else "rakuten"))
+    company = str(
+        payload.get("company")
+        or (session_state.company if session_state else "rakuten")
+    )
 
     try:
         duration_mins = int(
@@ -46,9 +45,20 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     is_demo_mode = bool(payload.get("is_demo_mode", False))
 
+    # CV context — from payload or session
+    cv_context: str | None = (
+        payload.get("cv_context")
+        or (session_state.cv_context if session_state else None)
+    )
+    if cv_context:
+        cv_context = str(cv_context).strip() or None
+
+    # transcript_history maps to conversation_history
     conversation_history: List[Any]
-    if isinstance(payload.get("conversation_history"), list):
-        conversation_history = payload.get("conversation_history", [])
+    if isinstance(payload.get("transcript_history"), list):
+        conversation_history = payload["transcript_history"]
+    elif isinstance(payload.get("conversation_history"), list):
+        conversation_history = payload["conversation_history"]
     elif session_state and isinstance(session_state.conversation_history, list):
         conversation_history = list(session_state.conversation_history)
     else:
@@ -62,9 +72,10 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
         is_demo_mode=is_demo_mode,
         user_message=user_message,
         conversation_history=conversation_history,
+        cv_context=cv_context,
     )
 
-    # Keep session state synchronized for clients that do not pass conversation_history.
+    # Sync conversation history back to session for stateful clients
     if session_state and isinstance(session_state.conversation_history, list):
         session_state.conversation_history = conversation_history
 

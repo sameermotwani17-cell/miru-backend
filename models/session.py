@@ -18,13 +18,11 @@ class SessionState:
 
     running_scores: Dict[str, float] = field(
         default_factory=lambda: {
-            "jiko_pr": 0.0,
-            "shibou_douki": 0.0,
-            "kyouchousei": 0.0,
-            "seichou_iyoku": 0.0,
-            "bunka_tekigou": 0.0,
+            "communication": 0.0,
+            "clarity": 0.0,
+            "cultural_fit": 0.0,
+            "problem_solving": 0.0,
         }
     )
 
     cv_context: Optional[str] = None
-

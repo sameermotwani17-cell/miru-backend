@@ -13,6 +13,7 @@ COMPANY_PROFILES = {
     "uniqlo": UNIQLO_PROFILE,
 }
 
+
 def build_system_prompt(
     company: str,
     language_mode: str,
@@ -27,21 +28,20 @@ def build_system_prompt(
     Assemble the full MIRU system prompt by stacking:
     1) Layer 1 — core HR persona
     2) Layer 2 — company-specific profile
-    3) Layer 3 — candidate and session context
+    3) Layer 3 — candidate and session context (including CV)
     4) Layer 4 — output schema / format instructions
     """
 
     company_profile = COMPANY_PROFILES.get(company, TOYOTA_PROFILE)
 
-    layer_3 = f"""
-Candidate name: {user_name or "Not provided"}
+    cv_section = f"Candidate CV:\n{cv_context}" if cv_context else "Candidate CV: Not provided"
+
+    layer_3 = f"""Candidate name: {user_name or "Not provided"}
 Target role: {target_role or "Not provided"}
 Language mode: {language_mode}
 Interview duration (minutes): {duration_mins}
 Demo mode: {"yes" if is_demo_mode else "no"}
-CV context:
-{cv_context or "Not provided"}
-""".strip()
+{cv_section}""".strip()
 
     prompt = "\n\n".join(
         [
@@ -55,34 +55,31 @@ CV context:
             (
                 "Return only valid JSON (no markdown, no extra text) in this exact shape:\n"
                 "{\n"
-                "  \"response\": \"<next interview question>\",\n"
+                "  \"interviewer_response\": \"<your spoken response to the candidate's answer>\",\n"
                 "  \"scores\": {\n"
-                "    \"jiko_pr\": <int 1-10>,\n"
-                "    \"shibou_douki\": <int 1-10>,\n"
-                "    \"kyouchousei\": <int 1-10>,\n"
-                "    \"seichou_iyoku\": <int 1-10>,\n"
-                "    \"bunka_tekigou\": <int 1-10>\n"
+                "    \"communication\": <int 1-10>,\n"
+                "    \"clarity\": <int 1-10>,\n"
+                "    \"cultural_fit\": <int 1-10>,\n"
+                "    \"problem_solving\": <int 1-10>\n"
                 "  },\n"
                 "  \"is_wrapping_up\": <boolean>\n"
-                "}\n"
-                "You are a strict Japanese corporate interviewer evaluating a candidate.\n"
-                "Use a conservative scale and evaluate only from the candidate's latest answer.\n"
-                "Evaluate clarity and structure independent of language; the answer may be in English or Japanese.\n"
-                "Scoring bands:\n"
+                "}\n\n"
+                "You are a professional interviewer evaluating a candidate.\n"
+                "The 'interviewer_response' should be a brief, natural spoken reaction to what the candidate just said "
+                "(1-3 sentences max). Do NOT include the next question here — just acknowledge the answer naturally.\n"
+                "Use the candidate's CV context (if provided) to make your response feel personalized and intelligent.\n\n"
+                "Scoring bands (1-10):\n"
                 "1-2: serious concern\n"
                 "3-4: weak answer\n"
                 "5-6: acceptable but average\n"
                 "7-8: strong answer\n"
-                "9: exceptional answer\n"
-                "10: almost never used\n"
-                "Most candidates should score between 4 and 6.\n"
-                "Do not give high scores unless the answer clearly demonstrates strong alignment with Japanese workplace values: teamwork harmony, humility, willingness to support group decisions, and continuous improvement mindset.\n"
-                "Answers emphasizing individualism or challenging hierarchy should lower kyouchousei and bunka_tekigou.\n"
-                "Calibration examples for kyouchousei:\n"
-                "Weak: 'I prefer working independently and usually push my own ideas.' -> 2-3\n"
-                "Average: 'I work well with teams and communicate openly.' -> 5-6\n"
-                "Strong: 'I support team consensus even if my initial idea differs.' -> 7-8\n"
-                "If kyouchousei <= 3, reduce bunka_tekigou by 1-2 points."
+                "9-10: exceptional (rare)\n\n"
+                "Score definitions:\n"
+                "- communication: how clearly and confidently they expressed themselves\n"
+                "- clarity: how well-structured and concise their answer was\n"
+                "- cultural_fit: alignment with the company's values and working style\n"
+                "- problem_solving: evidence of analytical thinking and handling challenges\n\n"
+                "Evaluate only from the candidate's latest answer. Be conservative — most candidates score 4-6."
             ),
         ]
     )
