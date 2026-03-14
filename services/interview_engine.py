@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Any, Dict, List
 
 from prompts.system_prompt import build_system_prompt
@@ -11,6 +12,54 @@ from store.interview_turns import get_session_turns, store_interview_turn
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
+INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
+
+_SUPPORTED_COMPANIES = ("rakuten", "toyota", "softbank", "sony", "uniqlo")
+
+with open(PROMPT_DIR / "hr_en.txt", "r", encoding="utf-8") as file:
+    HR_PROMPT_EN = file.read()
+
+with open(PROMPT_DIR / "hr_jp.txt", "r", encoding="utf-8") as file:
+    HR_PROMPT_JP = file.read()
+
+
+def _load_prompt_text(file_path: Path) -> str | None:
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except OSError:
+        return None
+
+
+COMPANY_HR_PROMPTS: Dict[tuple[str, str], str] = {}
+for company_name in _SUPPORTED_COMPANIES:
+    for language_key in ("en", "jp"):
+        text = _load_prompt_text(INTERVIEWER_PROMPT_DIR / f"{company_name}_{language_key}.txt")
+        if text:
+            COMPANY_HR_PROMPTS[(company_name, language_key)] = text
+
+
+def _normalize_language_mode(language_mode: str) -> str:
+    normalized = str(language_mode or "").strip().lower()
+    if normalized in {"jp", "ja", "japanese"}:
+        return "jp"
+    return "en"
+
+
+def _get_hr_prompt(company: str, language_mode: str) -> str:
+    company_key = str(company or "").strip().lower()
+    language_key = _normalize_language_mode(language_mode)
+
+    company_prompt = COMPANY_HR_PROMPTS.get((company_key, language_key))
+    if company_prompt:
+        return company_prompt
+
+    if language_key == "jp":
+        return HR_PROMPT_JP
+    return HR_PROMPT_EN
 
 
 _SCORE_KEYS = (
@@ -94,12 +143,15 @@ def run_interview_turn(
     LOGGER.info("[QUESTION_ID] %s", question["question_id"])
     LOGGER.info("[CATEGORY] %s", question["category"])
 
+    hr_prompt = _get_hr_prompt(company=company, language_mode=language_mode)
+
     # Build system prompt
     system_prompt = build_system_prompt(
         company=company,
         language_mode=language_mode,
         duration_mins=duration_mins,
         is_demo_mode=is_demo_mode,
+        hr_persona=hr_prompt,
     )
 
     # Copy conversation history and append latest message
@@ -126,18 +178,28 @@ def run_interview_turn(
 
     question_id = str(question["question_id"])
 
+    turn_number = turn_index + 1
+
     response_payload = {
+        "next_question": agent_text,
         "agent_text": agent_text,
         "scores": scores,
         "is_wrapping_up": is_wrapping_up,
         "question_id": question_id,
+        "session_id": session_id,
+        "turn": turn_number,
     }
+
+    # Persist conversation context in-engine so follow-up turns keep continuity.
+    if isinstance(conversation_history, list):
+        conversation_history.append({"role": "user", "content": user_message})
+        conversation_history.append({"role": "assistant", "content": agent_text})
 
     # Persistence is best-effort and must not break interview flow.
     try:
         store_interview_turn(
             session_id=session_id,
-            turn_index=turn_index + 1,
+            turn_index=turn_number,
             question_id=str(response_payload["question_id"]),
             question_category=str(question["category"]),
             question_prompt=str(response_payload["agent_text"]),

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.interview_routes import interview_router
 from api.interview_results import interview_results_router
 from routers.session import router as session_router
 
@@ -18,7 +19,13 @@ app.add_middleware(
 
 
 app.include_router(session_router)
+app.include_router(interview_router)
 app.include_router(interview_results_router)
+
+
+@app.get("/")
+async def root() -> dict:
+    return {"status": "MIRU backend running"}
 
 
 @app.get("/health")

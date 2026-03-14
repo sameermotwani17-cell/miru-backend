@@ -21,6 +21,7 @@ def build_system_prompt(
     cv_context: str | None = None,
     user_name: str = "",
     target_role: str = "",
+    hr_persona: str | None = None,
 ) -> str:
     """
     Assemble the full MIRU system prompt by stacking:
@@ -45,7 +46,7 @@ CV context:
     prompt = "\n\n".join(
         [
             "LAYER 1 — HR PERSONA",
-            HR_PERSONA.strip(),
+            (hr_persona or HR_PERSONA).strip(),
             "LAYER 2 — COMPANY PROFILE",
             company_profile.strip(),
             "LAYER 3 — CANDIDATE & SESSION CONTEXT",
