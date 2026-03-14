@@ -4,7 +4,6 @@ Tests for the MIRU adaptive interview engine.
 Run with: pytest tests/test_interview_engine.py -v
 """
 import sys
-import os
 from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
@@ -32,7 +31,6 @@ VALID_LLM_RESPONSE = {
 
 
 def _mock_llm(response: Dict[str, Any] = None):
-    """Return a patch object that replaces call_llm with a mock."""
     return patch(
         "services.interview_engine.call_llm",
         return_value=response or VALID_LLM_RESPONSE,
@@ -40,7 +38,6 @@ def _mock_llm(response: Dict[str, Any] = None):
 
 
 def _mock_store(existing_turns: List[Dict] = None):
-    """Patch get_session_turns and store_interview_turn."""
     return (
         patch("services.interview_engine.get_session_turns", return_value=existing_turns or []),
         patch("services.interview_engine.store_interview_turn", return_value=MagicMock()),
@@ -48,7 +45,6 @@ def _mock_store(existing_turns: List[Dict] = None):
 
 
 def _mock_results():
-    """Patch get_interview_results / save_interview_results."""
     return (
         patch("services.interview_engine.get_interview_results", return_value=None),
         patch("services.interview_engine.save_interview_results"),
@@ -74,7 +70,6 @@ class TestRunInterviewTurnStructure:
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="Hello, I am Sameer.",
-                conversation_history=[],
                 session_id="test_session_001",
             )
 
@@ -95,7 +90,6 @@ class TestRunInterviewTurnStructure:
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="My name is Sameer.",
-                conversation_history=[],
                 session_id="test_session_002",
             )
 
@@ -118,7 +112,6 @@ class TestRunInterviewTurnStructure:
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="Hello.",
-                conversation_history=[],
                 session_id="test_session_003",
             )
 
@@ -126,22 +119,22 @@ class TestRunInterviewTurnStructure:
 
 
 # ---------------------------------------------------------------------------
-# Test 2: messages sent to LLM always contain role/content
+# Test 2: messages sent to LLM always contain valid role/content
 # ---------------------------------------------------------------------------
 
 class TestLLMMessageIntegrity:
 
-    def test_malformed_history_filtered_out(self):
-        """Malformed messages (missing role/content) must not reach call_llm."""
+    def test_transcript_built_from_stored_turns(self):
+        """LLM conversation must be rebuilt from stored turns, not client input."""
         from services.interview_engine import run_interview_turn
 
-        malformed_history = [
-            {"role": "user", "content": "valid message"},
-            {"content": "no role here"},          # missing role
-            {"role": "assistant"},                 # missing content
-            {"role": "invalid_role", "content": "bad role"},
-            None,                                  # not a dict
-            "just a string",                       # not a dict
+        stored_turns = [
+            {
+                "turn_index": 1,
+                "interviewer_response": "Welcome to the interview.",
+                "user_answer": "I am a software engineer.",
+                "scores": {},
+            }
         ]
 
         captured_calls: List[Dict] = []
@@ -150,7 +143,7 @@ class TestLLMMessageIntegrity:
             captured_calls.append({"conversation": list(conversation)})
             return VALID_LLM_RESPONSE
 
-        p_turns, p_store = _mock_store()
+        p_turns, p_store = _mock_store(existing_turns=stored_turns)
         p_res_get, p_res_save = _mock_results()
 
         with patch("services.interview_engine.call_llm", side_effect=fake_llm), \
@@ -160,29 +153,29 @@ class TestLLMMessageIntegrity:
                 language_mode="en",
                 duration_mins=15,
                 is_demo_mode=False,
-                user_message="My answer.",
-                conversation_history=malformed_history,
+                user_message="My follow-up answer.",
                 session_id="test_session_004",
             )
 
         assert captured_calls, "LLM must have been called"
         sent_conversation = captured_calls[0]["conversation"]
 
-        valid_roles = {"system", "user", "assistant"}
-        for msg in sent_conversation:
-            assert isinstance(msg, dict), f"Non-dict message reached LLM: {msg}"
-            assert "role" in msg, f"Message missing 'role': {msg}"
-            assert "content" in msg, f"Message missing 'content': {msg}"
-            assert msg["role"] in valid_roles, f"Invalid role '{msg['role']}' reached LLM"
-            assert msg["content"], f"Empty content reached LLM: {msg}"
+        # Stored turn content must appear in the conversation sent to LLM
+        roles_contents = [(m["role"], m["content"]) for m in sent_conversation]
+        assert ("assistant", "Welcome to the interview.") in roles_contents
+        assert ("user", "I am a software engineer.") in roles_contents
 
-    def test_valid_history_passes_through(self):
-        """Valid history messages must reach call_llm unchanged."""
+    def test_all_messages_have_valid_role_and_content(self):
+        """Every message sent to call_llm must have a valid role and non-empty content."""
         from services.interview_engine import run_interview_turn
 
-        valid_history = [
-            {"role": "assistant", "content": "Hello, please introduce yourself."},
-            {"role": "user", "content": "I am a software engineer."},
+        stored_turns = [
+            {
+                "turn_index": 1,
+                "interviewer_response": "Hello, please introduce yourself.",
+                "user_answer": "I am Sameer from Liberia.",
+                "scores": {},
+            }
         ]
 
         captured_calls: List[Dict] = []
@@ -191,7 +184,7 @@ class TestLLMMessageIntegrity:
             captured_calls.append({"conversation": list(conversation)})
             return VALID_LLM_RESPONSE
 
-        p_turns, p_store = _mock_store()
+        p_turns, p_store = _mock_store(existing_turns=stored_turns)
         p_res_get, p_res_save = _mock_results()
 
         with patch("services.interview_engine.call_llm", side_effect=fake_llm), \
@@ -201,71 +194,124 @@ class TestLLMMessageIntegrity:
                 language_mode="en",
                 duration_mins=15,
                 is_demo_mode=False,
-                user_message="Follow-up answer.",
-                conversation_history=valid_history,
+                user_message="I enjoy collaborative work.",
                 session_id="test_session_005",
             )
 
-        sent_conversation = captured_calls[0]["conversation"]
-        # Both valid history messages should appear in the conversation
-        roles_contents = [(m["role"], m["content"]) for m in sent_conversation]
-        assert ("assistant", "Hello, please introduce yourself.") in roles_contents
-        assert ("user", "I am a software engineer.") in roles_contents
+        assert captured_calls, "LLM must have been called"
+        valid_roles = {"system", "user", "assistant"}
+        for msg in captured_calls[0]["conversation"]:
+            assert isinstance(msg, dict), f"Non-dict message sent to LLM: {msg}"
+            assert "role" in msg, f"Message missing 'role': {msg}"
+            assert "content" in msg, f"Message missing 'content': {msg}"
+            assert msg["role"] in valid_roles, f"Invalid role '{msg['role']}'"
+            assert msg["content"], f"Empty content in message: {msg}"
 
-
-# ---------------------------------------------------------------------------
-# Test 3: transcript grows correctly after each turn
-# ---------------------------------------------------------------------------
-
-class TestTranscriptGrowth:
-
-    def test_conversation_history_grows_after_turn(self):
+    def test_empty_stored_turns_sends_no_history(self):
+        """On the very first turn, conversation passed to LLM must be empty."""
         from services.interview_engine import run_interview_turn
 
-        conversation_history = []
-        p_turns, p_store = _mock_store()
+        captured_calls: List[Dict] = []
+
+        def fake_llm(system_prompt, conversation, user_message):
+            captured_calls.append({"conversation": list(conversation)})
+            return VALID_LLM_RESPONSE
+
+        p_turns, p_store = _mock_store(existing_turns=[])
         p_res_get, p_res_save = _mock_results()
 
-        with _mock_llm(), p_turns, p_store, p_res_get, p_res_save:
+        with patch("services.interview_engine.call_llm", side_effect=fake_llm), \
+             p_turns, p_store, p_res_get, p_res_save:
+            run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=15,
+                is_demo_mode=False,
+                user_message="Hello.",
+                session_id="test_session_006",
+            )
+
+        assert captured_calls, "LLM must have been called"
+        assert captured_calls[0]["conversation"] == [], "No history on first turn"
+
+
+# ---------------------------------------------------------------------------
+# Test 3: transcript is rebuilt correctly from stored turns
+# ---------------------------------------------------------------------------
+
+class TestTranscriptRebuild:
+
+    def test_rebuild_transcript_order(self):
+        """_rebuild_transcript must interleave assistant/user messages correctly."""
+        from services.interview_engine import _rebuild_transcript
+
+        turns = [
+            {
+                "interviewer_response": "Hello, welcome.",
+                "user_answer": "Hi, I am Sameer.",
+            },
+            {
+                "interviewer_response": "Thank you for that.",
+                "user_answer": "I worked at a startup.",
+            },
+        ]
+
+        transcript = _rebuild_transcript(turns)
+
+        assert transcript[0] == {"role": "assistant", "content": "Hello, welcome."}
+        assert transcript[1] == {"role": "user", "content": "Hi, I am Sameer."}
+        assert transcript[2] == {"role": "assistant", "content": "Thank you for that."}
+        assert transcript[3] == {"role": "user", "content": "I worked at a startup."}
+
+    def test_rebuild_transcript_skips_empty_fields(self):
+        """Turns with empty interviewer_response or user_answer are skipped."""
+        from services.interview_engine import _rebuild_transcript
+
+        turns = [
+            {"interviewer_response": "", "user_answer": "I am Sameer."},
+            {"interviewer_response": "Good answer.", "user_answer": ""},
+        ]
+
+        transcript = _rebuild_transcript(turns)
+
+        contents = [m["content"] for m in transcript]
+        assert "I am Sameer." in contents
+        assert "Good answer." in contents
+        assert "" not in contents
+
+    def test_rebuild_transcript_empty_turns(self):
+        """Empty turn list must produce empty transcript."""
+        from services.interview_engine import _rebuild_transcript
+
+        assert _rebuild_transcript([]) == []
+
+    def test_transcript_grows_after_each_turn(self):
+        """After a turn, the stored turn count must increase by 1."""
+        from services.interview_engine import run_interview_turn
+
+        stored_call_count = {"count": 0}
+        original_store = MagicMock()
+
+        def fake_store(**kwargs):
+            stored_call_count["count"] += 1
+            return original_store
+
+        p_turns, _ = _mock_store(existing_turns=[])
+        p_res_get, p_res_save = _mock_results()
+
+        with _mock_llm(), p_turns, \
+             patch("services.interview_engine.store_interview_turn", side_effect=fake_store), \
+             p_res_get, p_res_save:
             run_interview_turn(
                 company="rakuten",
                 language_mode="en",
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="Hello, my name is Sameer.",
-                conversation_history=conversation_history,
-                session_id="test_session_006",
-            )
-
-        # Must have: user message + interviewer_response + next_question
-        assert len(conversation_history) >= 2, "Transcript must grow after each turn"
-        roles = [m["role"] for m in conversation_history]
-        assert "user" in roles
-        assert "assistant" in roles
-
-    def test_conversation_roles_are_valid(self):
-        from services.interview_engine import run_interview_turn
-
-        conversation_history = []
-        p_turns, p_store = _mock_store()
-        p_res_get, p_res_save = _mock_results()
-
-        with _mock_llm(), p_turns, p_store, p_res_get, p_res_save:
-            run_interview_turn(
-                company="rakuten",
-                language_mode="en",
-                duration_mins=15,
-                is_demo_mode=False,
-                user_message="I enjoy collaborative environments.",
-                conversation_history=conversation_history,
                 session_id="test_session_007",
             )
 
-        valid_roles = {"user", "assistant", "system"}
-        for msg in conversation_history:
-            assert isinstance(msg, dict)
-            assert msg.get("role") in valid_roles
-            assert msg.get("content")
+        assert stored_call_count["count"] == 1, "store_interview_turn must be called once per turn"
 
 
 # ---------------------------------------------------------------------------
@@ -370,8 +416,7 @@ class TestMaxTurns:
     def test_interview_complete_at_max_turns(self):
         from services.interview_engine import run_interview_turn, MAX_TURNS
 
-        # Simulate having already completed MAX_TURNS
-        existing_turns = [{"turn_index": i} for i in range(MAX_TURNS)]
+        existing_turns = [{"turn_index": i, "interviewer_response": "", "user_answer": "answer"} for i in range(MAX_TURNS)]
 
         p_res_get, p_res_save = _mock_results()
 
@@ -386,18 +431,19 @@ class TestMaxTurns:
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="One more answer.",
-                conversation_history=[],
                 session_id="test_session_010",
             )
 
         assert result.get("interview_complete") is True
 
     def test_last_turn_sets_interview_complete(self):
-        """The turn that hits MAX_TURNS - 1 should mark interview_complete = True."""
+        """The turn that hits MAX_TURNS should mark interview_complete = True."""
         from services.interview_engine import run_interview_turn, MAX_TURNS, CLOSING_RESPONSE
 
-        # One turn short of the limit
-        existing_turns = [{"turn_index": i} for i in range(MAX_TURNS - 1)]
+        existing_turns = [
+            {"turn_index": i, "interviewer_response": "Good.", "user_answer": "answer"}
+            for i in range(MAX_TURNS - 1)
+        ]
 
         llm_response = {**VALID_LLM_RESPONSE, "is_wrapping_up": False}
 
@@ -415,7 +461,6 @@ class TestMaxTurns:
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="Final answer.",
-                conversation_history=[],
                 session_id="test_session_011",
             )
 

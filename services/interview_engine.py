@@ -100,6 +100,24 @@ def _normalize_scores(raw_scores: Any) -> Dict[str, int]:
     return normalized
 
 
+def _rebuild_transcript(existing_turns: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """
+    Reconstruct the conversation transcript from stored turns.
+    Backend is the single source of truth — client-sent history is never used.
+    """
+    transcript: List[Dict[str, str]] = []
+    for turn in existing_turns:
+        interviewer_response = turn.get("interviewer_response", "")
+        if interviewer_response:
+            transcript.append({"role": "assistant", "content": interviewer_response})
+
+        user_answer = turn.get("user_answer", "") or turn.get("answer", "")
+        if user_answer:
+            transcript.append({"role": "user", "content": user_answer})
+
+    return transcript
+
+
 def _build_turn_prompt(user_message: str, turn_index: int) -> str:
     if turn_index == 0:
         return (
@@ -139,21 +157,21 @@ def run_interview_turn(
     duration_mins: int,
     is_demo_mode: bool,
     user_message: str,
-    conversation_history: List[Any],
     session_id: str = "default_session",
     cv_context: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run a single MIRU interview turn.
 
-    The LLM fully controls the interview: it generates interviewer_response,
-    next_question, and scores in one call. No static question registry is used.
+    The backend is the single source of truth for conversation state.
+    Transcript is always rebuilt from stored turns — never from client-sent history.
+    The LLM generates interviewer_response, next_question, and scores each turn.
     """
 
-    previous_turns = get_session_turns(session_id)
-    turn_index = len(previous_turns)
+    existing_turns = get_session_turns(session_id)
+    turn_index = len(existing_turns)
 
-    # Interview complete — already at or past the turn limit
+    # Interview already complete — at or past the turn limit
     if turn_index >= MAX_TURNS:
         _trigger_debrief(session_id)
         return {"interview_complete": True}
@@ -171,21 +189,14 @@ def run_interview_turn(
         cv_context=cv_context,
     )
 
-    # Build conversation for LLM — filter malformed messages
-    clean_history: List[Dict[str, str]] = []
-    for msg in conversation_history:
-        if (
-            isinstance(msg, dict)
-            and msg.get("role") in {"system", "user", "assistant"}
-            and msg.get("content")
-        ):
-            clean_history.append({"role": msg["role"], "content": str(msg["content"])})
+    # Rebuild transcript from stored turns (backend-owned state)
+    transcript = _rebuild_transcript(existing_turns)
 
     turn_prompt = _build_turn_prompt(user_message, turn_index)
 
     llm_response = call_llm(
         system_prompt=system_prompt,
-        conversation=clean_history,
+        conversation=transcript,
         user_message=turn_prompt,
     )
 
@@ -200,13 +211,6 @@ def run_interview_turn(
 
     if is_last_turn:
         next_question = CLOSING_RESPONSE
-
-    # Update conversation history in-place for stateful clients
-    if isinstance(conversation_history, list):
-        conversation_history.append({"role": "user", "content": user_message})
-        conversation_history.append({"role": "assistant", "content": interviewer_response})
-        if next_question:
-            conversation_history.append({"role": "assistant", "content": next_question})
 
     turn_number = turn_index + 1
     question_id = f"Q_LLM_{turn_number:02d}"

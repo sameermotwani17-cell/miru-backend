@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 
@@ -45,38 +45,20 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     is_demo_mode = bool(payload.get("is_demo_mode", False))
 
-    # CV context — from payload or session
-    cv_context: str | None = (
-        payload.get("cv_context")
-        or (session_state.cv_context if session_state else None)
-    )
+    # CV context — from session only (never trust client-sent CV)
+    cv_context: str | None = session_state.cv_context if session_state else None
     if cv_context:
         cv_context = str(cv_context).strip() or None
 
-    # transcript_history maps to conversation_history
-    conversation_history: List[Any]
-    if isinstance(payload.get("transcript_history"), list):
-        conversation_history = payload["transcript_history"]
-    elif isinstance(payload.get("conversation_history"), list):
-        conversation_history = payload["conversation_history"]
-    elif session_state and isinstance(session_state.conversation_history, list):
-        conversation_history = list(session_state.conversation_history)
-    else:
-        conversation_history = []
+    # transcript_history and conversation_history from the client are intentionally ignored.
+    # The backend reconstructs transcript state from stored turns (single source of truth).
 
-    result = run_interview_turn(
+    return run_interview_turn(
         session_id=session_id,
         company=company,
         language_mode=language_mode,
         duration_mins=duration_mins,
         is_demo_mode=is_demo_mode,
         user_message=user_message,
-        conversation_history=conversation_history,
         cv_context=cv_context,
     )
-
-    # Sync conversation history back to session for stateful clients
-    if session_state and isinstance(session_state.conversation_history, list):
-        session_state.conversation_history = conversation_history
-
-    return result
