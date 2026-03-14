@@ -43,6 +43,9 @@ def call_llm(system_prompt: str, conversation: list, user_message: str):
                         "interviewer_response": {
                             "type": "string"
                         },
+                        "next_question": {
+                            "type": "string"
+                        },
                         "scores": {
                             "type": "object",
                             "additionalProperties": False,
@@ -81,6 +84,7 @@ def call_llm(system_prompt: str, conversation: list, user_message: str):
                     },
                     "required": [
                         "interviewer_response",
+                        "next_question",
                         "scores",
                         "is_wrapping_up"
                     ]
@@ -97,6 +101,7 @@ def call_llm(system_prompt: str, conversation: list, user_message: str):
     except Exception:
         return {
             "interviewer_response": raw_text,
+            "next_question": "",
             "scores": {
                 "communication": 5,
                 "clarity": 5,

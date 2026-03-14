@@ -74,6 +74,7 @@ def store_interview_turn(
     question_prompt: str,
     user_answer: str,
     scores: dict,
+    interviewer_response: str = "",
 ) -> InterviewTurn:
     score_dict = scores if isinstance(scores, dict) else {}
 
@@ -100,6 +101,7 @@ def store_interview_turn(
             "question_id": turn.question_id,
             "question_category": turn.question_category,
             "question_prompt": turn.question_prompt,
+            "interviewer_response": str(interviewer_response),
             "user_answer": turn.user_answer,
             "answer": turn.user_answer,
             "scores": {
@@ -148,6 +150,7 @@ def get_session_turns(session_id: str) -> List[Dict[str, Any]]:
                 "question_id": str(turn.get("question_id", "")),
                 "question_category": str(turn.get("question_category", "")),
                 "question_prompt": question_prompt,
+                "interviewer_response": str(turn.get("interviewer_response", "")),
                 "user_answer": user_answer,
                 "answer": user_answer,
                 "scores": {

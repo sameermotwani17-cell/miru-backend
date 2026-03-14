@@ -6,17 +6,25 @@ from prompts.system_prompt import build_system_prompt
 from services.debrief_engine import generate_interview_debrief
 from services.feedback_engine import generate_full_feedback_package
 from services.llm_client import call_llm
-from services.question_registry import get_next_question
 from store.interview_results import get_interview_results, save_interview_results
 from store.interview_turns import get_session_turns, store_interview_turn
 
 
 LOGGER = logging.getLogger(__name__)
 
+MAX_TURNS = 10
+
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
 
 _SUPPORTED_COMPANIES = ("rakuten", "toyota", "softbank", "sony", "uniqlo")
+
+_SCORE_KEYS = ("communication", "clarity", "cultural_fit", "problem_solving")
+
+CLOSING_RESPONSE = (
+    "Thank you for your time today. It has been a pleasure speaking with you. "
+    "This concludes our interview. Please wait for your assessment."
+)
 
 
 def _load_prompt_text(file_path: Path) -> Optional[str]:
@@ -27,11 +35,14 @@ def _load_prompt_text(file_path: Path) -> Optional[str]:
         return None
 
 
-with open(PROMPT_DIR / "hr_en.txt", "r", encoding="utf-8") as file:
-    HR_PROMPT_EN = file.read()
+def _load_hr_prompt(filename: str) -> str:
+    path = PROMPT_DIR / filename
+    text = _load_prompt_text(path)
+    return text or ""
 
-with open(PROMPT_DIR / "hr_jp.txt", "r", encoding="utf-8") as file:
-    HR_PROMPT_JP = file.read()
+
+HR_PROMPT_EN = _load_hr_prompt("hr_en.txt")
+HR_PROMPT_JP = _load_hr_prompt("hr_jp.txt")
 
 
 COMPANY_HR_PROMPTS: Dict[tuple, str] = {}
@@ -62,9 +73,6 @@ def _get_hr_prompt(company: str, language_mode: str) -> str:
     return HR_PROMPT_EN
 
 
-_SCORE_KEYS = ("communication", "clarity", "cultural_fit", "problem_solving")
-
-
 def _default_scores() -> Dict[str, int]:
     return {
         "communication": 5,
@@ -92,6 +100,39 @@ def _normalize_scores(raw_scores: Any) -> Dict[str, int]:
     return normalized
 
 
+def _build_turn_prompt(user_message: str, turn_index: int) -> str:
+    if turn_index == 0:
+        return (
+            f"The candidate has just joined the interview. Their opening message: \"{user_message}\"\n\n"
+            "Instructions:\n"
+            "- In 'interviewer_response': Greet the candidate warmly and professionally by name (if known). "
+            "Do not ask a question here.\n"
+            "- In 'next_question': Ask the candidate to introduce themselves. "
+            "This is the first question of the interview."
+        )
+    return (
+        f"Candidate's answer: {user_message}\n\n"
+        "Instructions:\n"
+        "- In 'interviewer_response': Acknowledge their answer briefly and naturally (1-3 sentences). "
+        "Do not repeat back what they said. Do not use filler like 'I see' or 'That is interesting'. "
+        "Reference a specific detail from their answer.\n"
+        "- In 'next_question': Ask one focused follow-up question that flows naturally from their answer. "
+        "Vary the type across the interview: behavioral, situational, motivational, or values-based. "
+        "Never repeat a question already asked."
+    )
+
+
+def _trigger_debrief(session_id: str) -> None:
+    try:
+        if get_interview_results(session_id) is None:
+            turns = get_session_turns(session_id)
+            debrief = generate_interview_debrief(turns)
+            feedback_package = generate_full_feedback_package(debrief)
+            save_interview_results(session_id, feedback_package)
+    except Exception as exc:
+        LOGGER.warning("[DEBRIEF] Failed to generate debrief for session %s: %s", session_id, exc)
+
+
 def run_interview_turn(
     company: str,
     language_mode: str,
@@ -105,30 +146,19 @@ def run_interview_turn(
     """
     Run a single MIRU interview turn.
 
-    Steps:
-    1. Build system prompt (with CV context if provided)
-    2. Append user message to conversation history
-    3. Call the LLM for interviewer_response + scores
-    4. Return next_question from registry + LLM interviewer_response
+    The LLM fully controls the interview: it generates interviewer_response,
+    next_question, and scores in one call. No static question registry is used.
     """
 
     previous_turns = get_session_turns(session_id)
     turn_index = len(previous_turns)
-    question = get_next_question(turn_index)
 
-    # Interview is complete — generate debrief if not already done
-    if question is None:
-        cached_results = get_interview_results(session_id)
-        if cached_results is None:
-            turns = get_session_turns(session_id)
-            debrief = generate_interview_debrief(turns)
-            feedback_package = generate_full_feedback_package(debrief)
-            save_interview_results(session_id, feedback_package)
+    # Interview complete — already at or past the turn limit
+    if turn_index >= MAX_TURNS:
+        _trigger_debrief(session_id)
         return {"interview_complete": True}
 
-    LOGGER.info("[INTERVIEW] Turn %s", turn_index + 1)
-    LOGGER.info("[QUESTION_ID] %s", question["question_id"])
-    LOGGER.info("[CATEGORY] %s", question["category"])
+    LOGGER.info("[INTERVIEW] session=%s turn=%s/%s", session_id, turn_index + 1, MAX_TURNS)
 
     hr_prompt = _get_hr_prompt(company=company, language_mode=language_mode)
 
@@ -141,58 +171,70 @@ def run_interview_turn(
         cv_context=cv_context,
     )
 
-    # Build conversation — use transcript_history passed in, or the running history
-    updated_conversation = list(conversation_history)
-    updated_conversation.append({"role": "user", "content": user_message})
+    # Build conversation for LLM — filter malformed messages
+    clean_history: List[Dict[str, str]] = []
+    for msg in conversation_history:
+        if (
+            isinstance(msg, dict)
+            and msg.get("role") in {"system", "user", "assistant"}
+            and msg.get("content")
+        ):
+            clean_history.append({"role": msg["role"], "content": str(msg["content"])})
 
-    prompt = (
-        f"Candidate's answer:\n{user_message}\n\n"
-        "Respond naturally to what they said (1-3 sentences), then score this answer. "
-        "Do NOT ask the next question in 'interviewer_response' — that is handled separately."
-    )
+    turn_prompt = _build_turn_prompt(user_message, turn_index)
 
     llm_response = call_llm(
         system_prompt=system_prompt,
-        conversation=updated_conversation,
-        user_message=prompt,
+        conversation=clean_history,
+        user_message=turn_prompt,
     )
 
-    # Next question always comes from the registry (deterministic)
-    next_question_text = str(question["prompt"])
-    question_id = str(question["question_id"])
-    turn_number = turn_index + 1
-
     interviewer_response = str(llm_response.get("interviewer_response") or "").strip()
+    next_question = str(llm_response.get("next_question") or "").strip()
     scores = _normalize_scores(llm_response.get("scores"))
     is_wrapping_up = bool(llm_response.get("is_wrapping_up", False))
 
-    # Update running conversation history for stateful clients
+    # Determine if this is the final turn
+    is_last_turn = (turn_index + 1 >= MAX_TURNS) or is_wrapping_up
+    interview_complete = is_last_turn
+
+    if is_last_turn:
+        next_question = CLOSING_RESPONSE
+
+    # Update conversation history in-place for stateful clients
     if isinstance(conversation_history, list):
         conversation_history.append({"role": "user", "content": user_message})
         conversation_history.append({"role": "assistant", "content": interviewer_response})
+        if next_question:
+            conversation_history.append({"role": "assistant", "content": next_question})
 
-    response_payload = {
-        "next_question": next_question_text,
-        "interviewer_response": interviewer_response,
-        "interview_complete": False,
-        "question_id": question_id,
-        "scores": scores,
-        "is_wrapping_up": is_wrapping_up,
-        "session_id": session_id,
-        "turn": turn_number,
-    }
+    turn_number = turn_index + 1
+    question_id = f"Q_LLM_{turn_number:02d}"
 
     try:
         store_interview_turn(
             session_id=session_id,
             turn_index=turn_number,
             question_id=question_id,
-            question_category=str(question["category"]),
-            question_prompt=next_question_text,
+            question_category="adaptive",
+            question_prompt=next_question,
             user_answer=user_message,
+            interviewer_response=interviewer_response,
             scores=scores,
         )
     except Exception as exc:
-        LOGGER.warning("Failed to persist interview turn: %s", exc)
+        LOGGER.warning("[INTERVIEW] Failed to persist turn: %s", exc)
 
-    return response_payload
+    if interview_complete:
+        _trigger_debrief(session_id)
+
+    return {
+        "next_question": next_question,
+        "interviewer_response": interviewer_response,
+        "interview_complete": interview_complete,
+        "question_id": question_id,
+        "scores": scores,
+        "is_wrapping_up": is_wrapping_up,
+        "session_id": session_id,
+        "turn": turn_number,
+    }
