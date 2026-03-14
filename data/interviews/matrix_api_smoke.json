@@ -1,0 +1,21 @@
+{
+  "session_id": "matrix_api_smoke",
+  "turns": [
+    {
+      "turn_index": 1,
+      "question_id": "q1",
+      "question_category": "general",
+      "question_prompt": "Tell me about teamwork",
+      "user_answer": "I collaborated with my team.",
+      "answer": "I collaborated with my team.",
+      "scores": {
+        "jiko_pr": 5,
+        "shibou_douki": 5,
+        "kyouchousei": 5,
+        "seichou_iyoku": 5,
+        "bunka_tekigou": 5
+      },
+      "timestamp": "2026-03-14T06:21:23Z"
+    }
+  ]
+}
