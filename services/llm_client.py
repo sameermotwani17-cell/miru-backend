@@ -10,12 +10,21 @@ def _get_client() -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
+_VALID_ROLES = {"system", "user", "assistant"}
+
+
 def call_llm(system_prompt: str, conversation: list, user_message: str):
     client = _get_client()
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in conversation:
-        messages.append(msg)
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role")
+        content = msg.get("content")
+        if role not in _VALID_ROLES or content is None:
+            continue
+        messages.append({"role": role, "content": str(content)})
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
