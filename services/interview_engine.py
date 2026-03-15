@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from prompts.system_prompt import build_system_prompt
 from services.debrief_engine import generate_interview_debrief
 from services.llm_client import call_llm
+from services.voice_service import generate_voice
 from services.score_dimensions import SCORE_DIMENSIONS, DEFAULT_SCORES
 from store.interview_results import (
     get_interview_results,
@@ -607,9 +608,12 @@ def run_interview_turn(
         except Exception as exc:
             LOGGER.exception("Debrief generation failed for session %s", session_id)
 
+    voice_audio = generate_voice(interviewer_response)
+
     return {
         "next_question": next_question,
         "interviewer_response": interviewer_response,
+        "voice_audio": voice_audio,
         "interview_complete": interview_complete,
         "question_id": question_id,
         "scores": scores,
