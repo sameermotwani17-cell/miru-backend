@@ -1,6 +1,7 @@
 import difflib
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -25,6 +26,7 @@ LOGGER = logging.getLogger(__name__)
 SAFETY_MAX_TURNS = 30
 MAX_TURNS = 10
 DEFAULT_MAX_QUESTIONS = 12
+LLM_TIMEOUT_SECONDS = 15
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
@@ -32,6 +34,7 @@ INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
 _SUPPORTED_COMPANIES = ("rakuten", "toyota", "softbank", "sony", "uniqlo")
 
 CLOSING_RESPONSE = "Thank you for your time today. That concludes the interview."
+FALLBACK_QUESTION = "Thank you. Let's continue with the next question. Could you share a concrete example from your recent work?"
 
 
 def _parse_iso_timestamp_to_ms(timestamp: str) -> Optional[int]:
@@ -283,6 +286,45 @@ def _build_qa_transcript(turns: List[Dict[str, Any]], turn_feedback: Optional[Li
             }
         )
     return transcript
+
+
+def _call_llm_with_timeout(
+    session_id: str,
+    system_prompt: str,
+    conversation: List[Dict[str, str]],
+    user_message: str,
+) -> Dict[str, Any]:
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(
+            call_llm,
+            system_prompt,
+            conversation,
+            user_message,
+        )
+        result = future.result(timeout=LLM_TIMEOUT_SECONDS)
+        executor.shutdown(wait=False, cancel_futures=True)
+
+        if isinstance(result, dict):
+            return result
+
+        LOGGER.warning("[INTERVIEW] LLM returned non-dict payload for session %s", session_id)
+    except FutureTimeoutError:
+        future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+        LOGGER.warning("LLM response timeout for session %s", session_id)
+    except Exception as exc:
+        executor.shutdown(wait=False, cancel_futures=True)
+        LOGGER.warning("[INTERVIEW] LLM call failed for session %s: %s", session_id, exc)
+
+    # Always return a safe fallback so run_interview_turn never blocks indefinitely.
+    return {
+        "interviewer_response": FALLBACK_QUESTION,
+        "next_question": FALLBACK_QUESTION,
+        "scores": dict(DEFAULT_SCORES),
+        "is_wrapping_up": False,
+        "_fallback": True,
+    }
 
 
 def _trigger_debrief(session_id: str) -> None:
@@ -545,7 +587,8 @@ def run_interview_turn(
 
     turn_prompt = _build_turn_prompt(user_message, turn_index)
 
-    llm_response = call_llm(
+    llm_response = _call_llm_with_timeout(
+        session_id=session_id,
         system_prompt=system_prompt,
         conversation=transcript,
         user_message=turn_prompt,
@@ -555,16 +598,18 @@ def run_interview_turn(
     next_question = str(llm_response.get("next_question") or "").strip()
     scores = _normalize_scores(llm_response.get("scores"))
     is_wrapping_up = bool(llm_response.get("is_wrapping_up", False))
+    is_fallback_response = bool(llm_response.get("_fallback", False))
 
-    # Guard: if the LLM embedded the question inside interviewer_response,
-    # clear interviewer_response so the candidate does not hear it twice.
-    interviewer_response, next_question = _fix_duplicate_question(
-        interviewer_response, next_question
-    )
+    if not is_fallback_response:
+        # Guard: if the LLM embedded the question inside interviewer_response,
+        # clear interviewer_response so the candidate does not hear it twice.
+        interviewer_response, next_question = _fix_duplicate_question(
+            interviewer_response, next_question
+        )
 
-    # Additional guard: if fields are still near-identical (>0.8), remove next_question
-    if _is_duplicate_question(interviewer_response, next_question):
-        next_question = ""
+        # Additional guard: if fields are still near-identical (>0.8), remove next_question
+        if _is_duplicate_question(interviewer_response, next_question):
+            next_question = ""
 
     # Completion is driven by the LLM's wrapping-up signal
     interview_complete = is_wrapping_up
