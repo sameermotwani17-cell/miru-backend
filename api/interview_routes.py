@@ -90,7 +90,10 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Include next_question so the candidate hears both the acknowledgment and the next question.
     interviewer_response = str(result.get("interviewer_response") or "")
     next_q = str(result.get("next_question") or "")
-    tts_parts = [p for p in [interviewer_response, next_q] if p]
+    # Deduplicate: fallback sets both fields to the same string, avoid speaking it twice.
+    tts_parts = [interviewer_response] if interviewer_response else []
+    if next_q and next_q != interviewer_response:
+        tts_parts.append(next_q)
     result["tts_text"] = " ".join(tts_parts)
     print("TTS text:", result["tts_text"])
 

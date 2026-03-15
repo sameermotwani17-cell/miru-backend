@@ -25,7 +25,7 @@ LOGGER = logging.getLogger(__name__)
 SAFETY_MAX_TURNS = 30
 MAX_TURNS = 10
 DEFAULT_MAX_QUESTIONS = 12
-LLM_TIMEOUT_SECONDS = 15
+LLM_TIMEOUT_SECONDS = 25
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
