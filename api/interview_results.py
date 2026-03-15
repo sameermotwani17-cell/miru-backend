@@ -44,7 +44,8 @@ def _build_transcript(turns: List[Dict[str, Any]], turn_feedback: List[Dict[str,
         qid = str(turn.get("question_id", "")).strip()
         coaching = feedback_by_qid.get(qid, {})
         question = str(turn.get("question") or turn.get("question_prompt") or "")
-        answer = str(turn.get("user_answer") or turn.get("answer") or "")
+        # Frontend consumes the canonical answer field; fallback keeps older stored turns readable.
+        answer = str(turn.get("answer") or turn.get("user_answer") or "")
         transcript.append({
             "question": question,
             "answer": answer,
