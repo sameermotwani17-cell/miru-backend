@@ -1,8 +1,8 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 
-from services.interview_engine import run_interview_turn, _trigger_debrief
+from services.interview_engine import run_interview_turn
 from store.sessions import get_session
 
 
@@ -10,7 +10,7 @@ interview_router = APIRouter(prefix="/api", tags=["interview"])
 
 
 @interview_router.post("/interview/turn")
-async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTasks) -> Dict[str, Any]:
+async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
     session_id = str(payload.get("session_id") or "").strip()
     if not session_id:
         raise HTTPException(status_code=422, detail="session_id is required")
@@ -81,9 +81,6 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
         max_questions=max_questions,
         force_complete=force_complete,
     )
-
-    if result.get("interview_complete"):
-        background_tasks.add_task(_trigger_debrief, session_id)
 
     voice_mode = bool(payload.get("voice_mode", False))
     if not voice_mode:

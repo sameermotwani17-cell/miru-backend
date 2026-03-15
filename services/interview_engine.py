@@ -105,6 +105,7 @@ def _finalize_interview_response(session_id: str, turn_number: int, scores: Dict
 
     return {
         "interview_complete": True,
+        "debrief_ready": True,
         "interviewer_response": CLOSING_RESPONSE,
         "voice_audio": voice_audio,
         "next_question": None,
@@ -639,6 +640,7 @@ def run_interview_turn(
         "interviewer_response": interviewer_response,
         "voice_audio": voice_audio,
         "interview_complete": interview_complete,
+        "debrief_ready": interview_complete,
         "question_id": question_id,
         "scores": scores,
         "is_wrapping_up": is_wrapping_up,
