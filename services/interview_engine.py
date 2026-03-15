@@ -193,6 +193,17 @@ def _fix_duplicate_question(
     return interviewer_response, next_question
 
 
+def _calculate_hiring_signal(scores: Dict[str, Any]) -> str:
+    avg = sum(float(scores.get(d, 0)) for d in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS)
+    if avg >= 7.5:
+        return "Strong Hire"
+    if avg >= 6:
+        return "Hire"
+    if avg >= 4.5:
+        return "Borderline"
+    return "No Hire"
+
+
 def _trigger_debrief(session_id: str) -> None:
     existing = get_interview_results(session_id)
     if existing is not None and existing.get("status") != "processing":
@@ -202,23 +213,25 @@ def _trigger_debrief(session_id: str) -> None:
     set_interview_results_processing(session_id)
 
     turns = get_session_turns(session_id)
+    used_debrief_fallback = False
 
     try:
         debrief = generate_interview_debrief(turns)
     except Exception as exc:
-        LOGGER.warning("[DEBRIEF] Debrief generation failed for session %s: %s", session_id, exc)
+        LOGGER.error("Debrief generation failed: %s", exc)
+        used_debrief_fallback = True
         debrief = {
             "overall_scores": dict(DEFAULT_SCORES),
-            "turn_evaluations": [],
+            "turn_feedback": [],
+            "hiring_signal": "Evaluation incomplete",
         }
 
-    try:
-        feedback_package = generate_full_feedback_package(debrief)
-    except Exception as exc:
-        LOGGER.warning("[DEBRIEF] Feedback package generation failed for session %s: %s", session_id, exc)
+    if used_debrief_fallback:
         feedback_package = {
             "overall_scores": dict(DEFAULT_SCORES),
             "turn_feedback": [],
+            "transcript": [],
+            "hiring_signal": "Evaluation incomplete",
             "final_report": {
                 "overall_summary": "Debrief generation fallback applied.",
                 "strengths": [],
@@ -227,6 +240,33 @@ def _trigger_debrief(session_id: str) -> None:
                 "overall_scores": dict(DEFAULT_SCORES),
             },
         }
+    else:
+        try:
+            feedback_package = generate_full_feedback_package(debrief)
+        except Exception as exc:
+            LOGGER.warning("[DEBRIEF] Feedback package generation failed for session %s: %s", session_id, exc)
+            feedback_package = {
+                "overall_scores": dict(DEFAULT_SCORES),
+                "turn_feedback": [],
+                "transcript": [],
+                "hiring_signal": "Evaluation incomplete",
+                "final_report": {
+                    "overall_summary": "Debrief generation fallback applied.",
+                    "strengths": [],
+                    "improvement_areas": [],
+                    "recommended_focus": "",
+                    "overall_scores": dict(DEFAULT_SCORES),
+                },
+            }
+
+    normalized_scores = {
+        dim: float(feedback_package.get("overall_scores", {}).get(dim, DEFAULT_SCORES[dim]))
+        for dim in SCORE_DIMENSIONS
+    }
+    feedback_package["overall_scores"] = normalized_scores
+    feedback_package.setdefault("turn_feedback", [])
+    feedback_package.setdefault("transcript", [])
+    feedback_package.setdefault("hiring_signal", _calculate_hiring_signal(normalized_scores))
 
     save_interview_results(session_id, feedback_package)
 

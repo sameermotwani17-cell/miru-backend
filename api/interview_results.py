@@ -52,31 +52,43 @@ def _format_list_as_string(value: Any) -> str:
     return str(value or "")
 
 
-def _normalize_radar_scores(scores: Any) -> Dict[str, float]:
-    safe_scores = scores if isinstance(scores, dict) and scores else DEFAULT_SCORES
+def normalize_scores(scores: Dict[str, Any]) -> Dict[str, float]:
     return {
-        dim: float(safe_scores.get(dim, 0))
+        dim: float(scores.get(dim, DEFAULT_SCORES[dim]))
         for dim in SCORE_DIMENSIONS
     }
 
 
+def _compute_hiring_signal(scores: Dict[str, float]) -> str:
+    avg = sum(scores.get(d, 0) for d in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS)
+    if avg >= 7.5:
+        return "Strong Hire"
+    if avg >= 6:
+        return "Hire"
+    if avg >= 4.5:
+        return "Borderline"
+    return "No Hire"
+
+
 def _build_results_response(session_id: str) -> Dict[str, Any]:
     turns = get_session_turns(session_id)
-    cached_results = get_interview_results(session_id)
+    cached_results = get_interview_results(session_id) or {}
 
     # Aggregate scores from stored turn data
     overall_scores = _aggregate_scores_from_turns(turns)
 
     # Override with debrief scores if available (more accurate)
-    if cached_results and isinstance(cached_results.get("overall_scores"), dict):
+    if isinstance(cached_results.get("overall_scores"), dict):
         debrief_scores = cached_results["overall_scores"]
         if all(k in debrief_scores for k in SCORE_DIMENSIONS):
             overall_scores = {k: float(debrief_scores[k]) for k in SCORE_DIMENSIONS}
 
-    radar_scores = _normalize_radar_scores(overall_scores)
+    radar_scores = normalize_scores(overall_scores)
 
     # Build role-based transcript
-    transcript = _build_transcript(turns)
+    transcript = cached_results.get("transcript", _build_transcript(turns))
+    if not isinstance(transcript, list):
+        transcript = []
 
     # Build feedback block
     feedback: Dict[str, Any] = {
@@ -84,25 +96,23 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         "areas_for_improvement": "",
         "summary": "",
     }
-    if cached_results:
-        final_report = cached_results.get("final_report", {})
-        if isinstance(final_report, dict):
-            feedback["summary"] = str(final_report.get("overall_summary", ""))
-            feedback["strengths"] = _format_list_as_string(final_report.get("strengths", []))
-            feedback["areas_for_improvement"] = _format_list_as_string(
-                final_report.get("improvement_areas", [])
-            )
+    final_report = cached_results.get("final_report", {})
+    if isinstance(final_report, dict):
+        feedback["summary"] = str(final_report.get("overall_summary", ""))
+        feedback["strengths"] = _format_list_as_string(final_report.get("strengths", []))
+        feedback["areas_for_improvement"] = _format_list_as_string(
+            final_report.get("improvement_areas", [])
+        )
 
-    # Hiring signal — average across all 5 Japanese HR dimensions
-    avg = sum(radar_scores.get(d, 0) for d in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS)
-    if avg >= 7.5:
-        hiring_signal = "Strong Hire"
-    elif avg >= 6.0:
-        hiring_signal = "Hire"
-    elif avg >= 4.5:
-        hiring_signal = "Borderline"
+    if cached_results.get("hiring_signal"):
+        hiring_signal = str(cached_results.get("hiring_signal"))
+    elif cached_results.get("status") == "processing" or (not turns and not cached_results):
+        hiring_signal = "Pending"
     else:
-        hiring_signal = "No Hire"
+        hiring_signal = _compute_hiring_signal(radar_scores)
+    turn_feedback = cached_results.get("turn_feedback", [])
+    if not isinstance(turn_feedback, list):
+        turn_feedback = []
 
     response_payload: Dict[str, Any] = {
         "session_id": session_id,
@@ -111,12 +121,8 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         "feedback": feedback,
         "hiring_signal": hiring_signal,
         "radar_scores": radar_scores,
-        "turn_feedback": [],
+        "turn_feedback": turn_feedback,
     }
-
-    # Attach turn-level feedback if available
-    if cached_results and isinstance(cached_results.get("turn_feedback"), list):
-        response_payload["turn_feedback"] = cached_results["turn_feedback"]
 
     return response_payload
 
@@ -178,6 +184,8 @@ def get_transcript(session_id: str) -> Dict[str, Any]:
 @interview_results_router.get("/{session_id}/debrief-status")
 def get_debrief_status(session_id: str) -> Dict[str, str]:
     cached_results = get_interview_results(session_id)
-    if cached_results is not None and cached_results.get("status") != "processing":
-        return {"status": "ready"}
+    if isinstance(cached_results, dict):
+        turn_feedback = cached_results.get("turn_feedback", [])
+        if isinstance(turn_feedback, list) and len(turn_feedback) > 0:
+            return {"status": "ready"}
     return {"status": "pending"}
