@@ -89,4 +89,9 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
     if not voice_mode:
         result.pop("voice_audio", None)
 
+    # Guarantee tts_text is always present for ElevenLabs (speech generated on frontend)
+    interviewer_response = str(result.get("interviewer_response") or "")
+    result["tts_text"] = interviewer_response
+    print("TTS text:", interviewer_response)
+
     return result
