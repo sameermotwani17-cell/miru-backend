@@ -165,16 +165,28 @@ def _rebuild_transcript(existing_turns: List[Dict[str, Any]]) -> List[Dict[str, 
     """
     Reconstruct the conversation transcript from stored turns.
     Backend is the single source of truth — client-sent history is never used.
+
+    Each turn contributes up to three messages in order:
+      1. assistant: question_prompt  — the question that was asked to the candidate
+      2. user:      user_answer      — the candidate's response
+      3. assistant: interviewer_response — the interviewer's acknowledgment
+
+    Including question_prompt gives the LLM full recall of every question
+    already asked, which prevents repeated questions across turns.
     """
     transcript: List[Dict[str, str]] = []
     for turn in existing_turns:
-        interviewer_response = turn.get("interviewer_response", "")
-        if interviewer_response:
-            transcript.append({"role": "assistant", "content": interviewer_response})
+        question = turn.get("question_prompt") or ""
+        if question:
+            transcript.append({"role": "assistant", "content": question})
 
-        user_answer = turn.get("user_answer", "") or turn.get("answer", "")
+        user_answer = turn.get("user_answer") or turn.get("answer") or ""
         if user_answer:
             transcript.append({"role": "user", "content": user_answer})
+
+        ack = turn.get("interviewer_response") or ""
+        if ack:
+            transcript.append({"role": "assistant", "content": ack})
 
     return transcript
 
@@ -201,15 +213,29 @@ def _build_turn_prompt(user_message: str, turn_index: int) -> str:
     )
 
 
-_DUPLICATE_SIMILARITY_THRESHOLD = 0.6
+_DUPLICATE_SIMILARITY_THRESHOLD = 0.75
 
 
-def _is_duplicate_question(a: str, b: str) -> bool:
-    """Return True if a and b are likely the same question (similarity > 0.8)."""
-    if not a or not b:
+def _is_duplicate_question(new_question: str, existing_turns: List[Dict[str, Any]]) -> bool:
+    """
+    Return True if new_question is sufficiently similar to any question_prompt
+    already stored in existing_turns (threshold: 0.75).
+
+    This gives the LLM a hard backstop: even if it lacks context about prior
+    questions, the engine will catch and replace near-duplicate questions before
+    they reach the candidate.
+    """
+    if not new_question:
         return False
-    similarity = difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
-    return similarity > 0.8
+    q_norm = new_question.lower().strip()
+    for turn in existing_turns:
+        prev_q = turn.get("question_prompt") or ""
+        if not prev_q:
+            continue
+        similarity = difflib.SequenceMatcher(None, q_norm, prev_q.lower().strip()).ratio()
+        if similarity >= _DUPLICATE_SIMILARITY_THRESHOLD:
+            return True
+    return False
 
 
 def _fix_duplicate_question(
@@ -611,9 +637,16 @@ def run_interview_turn(
             interviewer_response, next_question
         )
 
-        # Additional guard: if fields are still near-identical (>0.8), remove next_question
-        if _is_duplicate_question(interviewer_response, next_question):
-            next_question = ""
+        # Guard: if next_question repeats any question already asked this session,
+        # replace it with the fallback so the candidate never hears the same
+        # question twice. Uses 0.75 similarity against all stored question_prompts.
+        if _is_duplicate_question(next_question, existing_turns):
+            LOGGER.warning(
+                "[INTERVIEW] Duplicate question detected and replaced for session %s: %s",
+                session_id,
+                next_question,
+            )
+            next_question = FALLBACK_QUESTION
 
     # Completion is driven by the LLM's wrapping-up signal
     interview_complete = is_wrapping_up
