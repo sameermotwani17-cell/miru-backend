@@ -260,13 +260,26 @@ def _calculate_hiring_signal(scores: Dict[str, Any]) -> str:
     return "No Hire"
 
 
-def _build_qa_transcript(turns: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    transcript: List[Dict[str, str]] = []
+def _build_qa_transcript(turns: List[Dict[str, Any]], turn_feedback: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    feedback_by_qid: Dict[str, Dict[str, Any]] = {}
+    for item in turn_feedback or []:
+        if not isinstance(item, dict):
+            continue
+        qid = str(item.get("question_id", "")).strip()
+        if qid:
+            feedback_by_qid[qid] = item
+
+    transcript: List[Dict[str, Any]] = []
     for turn in turns:
+        qid = str(turn.get("question_id", "")).strip()
+        coaching = feedback_by_qid.get(qid, {})
         transcript.append(
             {
                 "question": str(turn.get("question") or turn.get("question_prompt") or ""),
                 "answer": str(turn.get("user_answer") or turn.get("answer") or ""),
+                "score": float(turn.get("score", 5.0) or 5.0),
+                "feedback": str(turn.get("feedback") or coaching.get("feedback") or ""),
+                "better_example": str(turn.get("better_example") or coaching.get("rewrite_example") or ""),
             }
         )
     return transcript
@@ -335,7 +348,7 @@ def _trigger_debrief(session_id: str) -> None:
     feedback_package.setdefault("turn_feedback", [])
     feedback_package.setdefault("hiring_signal", _calculate_hiring_signal(normalized_scores))
 
-    transcript = _build_qa_transcript(turns)
+    transcript = _build_qa_transcript(turns, feedback_package.get("turn_feedback", []))
     final_report = feedback_package.get("final_report", {})
     if not isinstance(final_report, dict):
         final_report = {}
@@ -405,9 +418,13 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
+                question="",
                 user_answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
+                score=5.0,
+                feedback="",
+                better_example="",
             )
         except Exception as exc:
             LOGGER.warning("[INTERVIEW] Failed to persist force-complete turn: %s", exc)
@@ -436,9 +453,13 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
+                question="",
                 user_answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
+                score=5.0,
+                feedback="",
+                better_example="",
             )
         except Exception as exc:
             LOGGER.warning("[INTERVIEW] Failed to persist max-turn completion turn: %s", exc)
@@ -456,9 +477,13 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
+                question="",
                 user_answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
+                score=5.0,
+                feedback="",
+                better_example="",
             )
         except Exception as exc:
             LOGGER.warning("[INTERVIEW] Failed to persist completion turn: %s", exc)
@@ -485,9 +510,13 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
+                question="",
                 user_answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
+                score=5.0,
+                feedback="",
+                better_example="",
             )
         except Exception as exc:
             LOGGER.warning("[INTERVIEW] Failed to persist completion turn: %s", exc)
@@ -554,9 +583,13 @@ def run_interview_turn(
             question_id=question_id,
             question_category="adaptive",
             question_prompt=next_question or "",
+            question=next_question or "",
             user_answer=user_message,
             interviewer_response=interviewer_response,
             scores=scores,
+            score=round(sum(float(scores.get(dim, 5)) for dim in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS), 2),
+            feedback="",
+            better_example="",
         )
     except Exception as exc:
         LOGGER.warning("[INTERVIEW] Failed to persist turn: %s", exc)

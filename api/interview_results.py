@@ -29,15 +29,28 @@ def _aggregate_scores_from_turns(turns: List[Dict[str, Any]]) -> Dict[str, float
     }
 
 
-def _build_transcript(turns: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    """Build frontend transcript rows using canonical question/answer keys."""
-    transcript: List[Dict[str, str]] = []
+def _build_transcript(turns: List[Dict[str, Any]], turn_feedback: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Build frontend transcript rows with question/answer and coaching fields."""
+    feedback_by_qid: Dict[str, Dict[str, Any]] = {}
+    for item in turn_feedback:
+        if not isinstance(item, dict):
+            continue
+        qid = str(item.get("question_id", "")).strip()
+        if qid:
+            feedback_by_qid[qid] = item
+
+    transcript: List[Dict[str, Any]] = []
     for turn in turns:
+        qid = str(turn.get("question_id", "")).strip()
+        coaching = feedback_by_qid.get(qid, {})
         question = str(turn.get("question") or turn.get("question_prompt") or "")
         answer = str(turn.get("user_answer") or turn.get("answer") or "")
         transcript.append({
             "question": question,
             "answer": answer,
+            "score": float(turn.get("score", 5.0) or 5.0),
+            "feedback": str(turn.get("feedback") or coaching.get("feedback") or ""),
+            "better_example": str(turn.get("better_example") or coaching.get("rewrite_example") or ""),
         })
 
     return transcript
@@ -82,7 +95,11 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
     overall_scores = normalize_scores(cached_results.get("overall_scores", {}))
     radar_scores = normalize_scores(cached_results.get("radar_scores", overall_scores))
 
-    transcript = _build_transcript(turns)
+    turn_feedback = cached_results.get("turn_feedback", [])
+    if not isinstance(turn_feedback, list):
+        turn_feedback = []
+
+    transcript = _build_transcript(turns, turn_feedback)
 
     feedback: Dict[str, Any] = {
         "strengths": "",
@@ -113,10 +130,6 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         cached_results.get("hiring_signal")
         or _compute_hiring_signal(radar_scores)
     )
-
-    turn_feedback = cached_results.get("turn_feedback", [])
-    if not isinstance(turn_feedback, list):
-        turn_feedback = []
 
     response_payload: Dict[str, Any] = {
         "session_id": session_id,
@@ -192,7 +205,7 @@ def get_transcript(session_id: str) -> Dict[str, Any]:
     turns = get_session_turns(session_id)
     if not turns:
         return {"error": "Session not found"}
-    return {"transcript": _build_transcript(turns)}
+    return {"transcript": _build_transcript(turns, [])}
 
 
 @interview_results_router.get("/{session_id}/debrief-status")

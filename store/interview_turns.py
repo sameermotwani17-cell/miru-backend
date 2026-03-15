@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from models.interview_turn import InterviewTurn
+from services.score_dimensions import SCORE_DIMENSIONS
 
 
 LOGGER = logging.getLogger(__name__)
@@ -75,8 +76,19 @@ def store_interview_turn(
     user_answer: str,
     scores: dict,
     interviewer_response: str = "",
+    question: str = "",
+    score: float | None = None,
+    feedback: str = "",
+    better_example: str = "",
 ) -> InterviewTurn:
     score_dict = scores if isinstance(scores, dict) else {}
+    if score is None:
+        score_values = [
+            float(score_dict.get(dim, 5))
+            for dim in SCORE_DIMENSIONS
+            if isinstance(score_dict.get(dim, 5), (int, float))
+        ]
+        score = round(sum(score_values) / len(score_values), 2) if score_values else 5.0
 
     turn = InterviewTurn(
         session_id=session_id,
@@ -103,8 +115,12 @@ def store_interview_turn(
             "question_category": turn.question_category,
             "question_prompt": turn.question_prompt,
             "interviewer_response": str(interviewer_response),
+            "question": str(question or question_prompt),
             "user_answer": turn.user_answer,
             "answer": turn.user_answer,
+            "score": float(score),
+            "feedback": str(feedback or ""),
+            "better_example": str(better_example or ""),
             "scores": {
                 "wa_teamwork": turn.wa_teamwork,
                 "loyalty_commitment": turn.loyalty_commitment,
@@ -151,10 +167,14 @@ def get_session_turns(session_id: str) -> List[Dict[str, Any]]:
                 "turn_index": int(turn.get("turn_index", 0) or 0),
                 "question_id": str(turn.get("question_id", "")),
                 "question_category": str(turn.get("question_category", "")),
+                "question": str(turn.get("question") or question_prompt),
                 "question_prompt": question_prompt,
                 "interviewer_response": str(turn.get("interviewer_response", "")),
                 "user_answer": user_answer,
                 "answer": user_answer,
+                "score": float(turn.get("score", 5.0) or 5.0),
+                "feedback": str(turn.get("feedback", "")),
+                "better_example": str(turn.get("better_example", "")),
                 "scores": {
                     "wa_teamwork": int(scores.get("wa_teamwork", 5)),
                     "loyalty_commitment": int(scores.get("loyalty_commitment", 5)),
