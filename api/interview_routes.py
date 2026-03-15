@@ -85,4 +85,8 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
     if result.get("interview_complete"):
         background_tasks.add_task(_trigger_debrief, session_id)
 
+    voice_mode = bool(payload.get("voice_mode", False))
+    if not voice_mode:
+        result.pop("voice_audio", None)
+
     return result

@@ -147,6 +147,47 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         or _compute_hiring_signal(radar_scores)
     )
 
+    # Enrich turn_feedback items with question/answer from stored turns and
+    # normalise rewrite_example → better_example so the frontend mapping works.
+    turns_by_qid: Dict[str, Dict[str, Any]] = {
+        str(t.get("question_id", "")).strip(): t for t in turns
+    }
+    enriched_turn_feedback: List[Dict[str, Any]] = []
+    for item in turn_feedback:
+        if not isinstance(item, dict):
+            enriched_turn_feedback.append(item)
+            continue
+        qid = str(item.get("question_id", "")).strip()
+        stored_turn = turns_by_qid.get(qid) if qid else None
+        if stored_turn is not None:
+            question_val = (
+                item.get("question")
+                or stored_turn.get("question")
+                or stored_turn.get("question_prompt")
+                or ""
+            )
+            answer_val = (
+                item.get("answer")
+                or stored_turn.get("answer")
+                or stored_turn.get("user_answer")
+                or ""
+            )
+        else:
+            # No matching stored turn — return null so the frontend can detect absence
+            question_val = item.get("question") or None
+            answer_val = item.get("answer") or None
+        enriched_turn_feedback.append({
+            **item,
+            "question": question_val,
+            "answer": answer_val,
+            # better_example: map rewrite_example → better_example for frontend compat
+            "better_example": (
+                item.get("better_example")
+                or item.get("rewrite_example")
+                or ""
+            ),
+        })
+
     response_payload: Dict[str, Any] = {
         "session_id": session_id,
         "scores": radar_scores,
@@ -155,7 +196,7 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         "final_report": final_report if isinstance(final_report, dict) else {},
         "hiring_signal": hiring_signal,
         "radar_scores": radar_scores,
-        "turn_feedback": turn_feedback,
+        "turn_feedback": enriched_turn_feedback,
     }
 
     return response_payload
