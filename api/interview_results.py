@@ -89,12 +89,22 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         [{"turn_index": t.get("turn_index"), "question": t.get("question"), "answer": t.get("answer")} for t in turns],
     )
     cached_results = get_interview_results(session_id)
+
+    # Auto-trigger debrief if results are missing entirely — handles cases where the
+    # background task or inline trigger hasn't run yet when the client polls.
+    if not isinstance(cached_results, dict) or not cached_results:
+        LOGGER.info("[RESULTS] No results for session %s — auto-triggering debrief", session_id)
+        try:
+            from services.debrief_engine import generate_interview_debrief
+            generate_interview_debrief(session_id)
+            cached_results = get_interview_results(session_id)
+        except Exception as exc:
+            LOGGER.error("[RESULTS] Auto-debrief failed for session %s: %s", session_id, exc)
+
     if not isinstance(cached_results, dict) or not cached_results:
         raise KeyError("results_not_ready")
 
-    # Return immediately if results exist; debrief now runs synchronously so
-    # "processing" state should be very transient (race on early retry only).
-    # Only block when there are genuinely no results yet.
+    # Block only while debrief is still in-flight with no scores yet.
     if cached_results.get("status") == "processing" and not cached_results.get("overall_scores"):
         raise KeyError("results_not_ready")
 

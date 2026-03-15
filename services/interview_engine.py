@@ -80,9 +80,33 @@ def _elapsed_time_reached(
 
 
 def _finalize_interview_response(session_id: str, turn_number: int, scores: Dict[str, int]) -> Dict[str, Any]:
+    """Return a completion response and ensure debrief is triggered for ALL completion paths."""
+    # Mark results as in-progress so polling can detect completion immediately.
+    try:
+        set_interview_results_processing(session_id)
+    except Exception as exc:
+        LOGGER.warning("[INTERVIEW] set_interview_results_processing failed for %s: %s", session_id, exc)
+
+    # Trigger debrief inline — covers force_complete, max_turns, and time-based paths
+    # that bypass the LLM is_wrapping_up code block.
+    try:
+        from services.debrief_engine import generate_interview_debrief
+        LOGGER.info("[INTERVIEW] Generating debrief for session %s (finalize path)", session_id)
+        generate_interview_debrief(session_id)
+    except Exception as exc:
+        LOGGER.exception("[INTERVIEW] Inline debrief failed for session %s: %s", session_id, exc)
+
+    voice_audio = None
+    try:
+        from services.voice_service import generate_voice
+        voice_audio = generate_voice(CLOSING_RESPONSE)
+    except Exception as exc:
+        LOGGER.warning("[INTERVIEW] Voice generation failed in finalize: %s", exc)
+
     return {
         "interview_complete": True,
         "interviewer_response": CLOSING_RESPONSE,
+        "voice_audio": voice_audio,
         "next_question": None,
         "scores": scores,
         "question_id": f"Q_LLM_{turn_number:02d}",
