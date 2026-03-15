@@ -26,8 +26,7 @@ def save_interview_results(session_id: str, results: Dict[str, Any]) -> None:
         try:
             cur.execute(
                 "INSERT INTO interview_results (session_id, results) VALUES (%s, %s) "
-                "ON CONFLICT (session_id) DO UPDATE SET results = EXCLUDED.results, "
-                "updated_at = now()",
+                "ON CONFLICT (session_id) DO UPDATE SET results = EXCLUDED.results",
                 (sid, json.dumps(results)),
             )
         finally:

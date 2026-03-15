@@ -172,14 +172,17 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
                 or stored_turn.get("user_answer")
                 or ""
             )
+            score_val = float(stored_turn.get("score", 5.0) or 5.0)
         else:
             # No matching stored turn — return null so the frontend can detect absence
             question_val = item.get("question") or None
             answer_val = item.get("answer") or None
+            score_val = float(item.get("score", 5.0) or 5.0)
         enriched_turn_feedback.append({
             **item,
             "question": question_val,
             "answer": answer_val,
+            "score": score_val,
             # better_example: map rewrite_example → better_example for frontend compat
             "better_example": (
                 item.get("better_example")
