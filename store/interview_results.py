@@ -12,17 +12,24 @@ _BASE_DIR = Path(__file__).resolve().parents[1]
 _RESULTS_DIR = _BASE_DIR / "data" / "results"
 
 
+def set_interview_results_processing(session_id: str) -> None:
+    sid = str(session_id)
+    _results_store[sid] = {"status": "processing"}
+
+
 def save_interview_results(session_id: str, results: Dict[str, Any]) -> None:
     sid = str(session_id)
-    _results_store[sid] = dict(results)
+    payload = dict(results)
 
     try:
         _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         file_path = _RESULTS_DIR / f"{sid}.json"
         with file_path.open("w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
+            json.dump(payload, f, ensure_ascii=False, indent=2)
     except Exception as exc:
         LOGGER.warning("[RESULTS] Failed to persist results to disk for session %s: %s", sid, exc)
+
+    _results_store[sid] = payload
 
 
 def get_interview_results(session_id: str) -> Optional[Dict[str, Any]]:

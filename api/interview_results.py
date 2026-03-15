@@ -4,10 +4,9 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Query
 
 from services.analytics_engine import get_radar_chart_data
-from services.score_dimensions import SCORE_DIMENSIONS
+from services.score_dimensions import DEFAULT_SCORES, SCORE_DIMENSIONS
 from store.interview_results import get_interview_results
 from store.interview_turns import get_session_turns
-from store.sessions import get_session
 
 
 LOGGER = logging.getLogger(__name__)
@@ -53,13 +52,17 @@ def _format_list_as_string(value: Any) -> str:
     return str(value or "")
 
 
+def _normalize_radar_scores(scores: Any) -> Dict[str, float]:
+    safe_scores = scores if isinstance(scores, dict) and scores else DEFAULT_SCORES
+    return {
+        dim: float(safe_scores.get(dim, 0))
+        for dim in SCORE_DIMENSIONS
+    }
+
+
 def _build_results_response(session_id: str) -> Dict[str, Any]:
     turns = get_session_turns(session_id)
     cached_results = get_interview_results(session_id)
-
-    # Session not found at all — no turns, no cached results
-    if not turns and cached_results is None:
-        return {"error": "Session not found"}
 
     # Aggregate scores from stored turn data
     overall_scores = _aggregate_scores_from_turns(turns)
@@ -69,6 +72,8 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         debrief_scores = cached_results["overall_scores"]
         if all(k in debrief_scores for k in SCORE_DIMENSIONS):
             overall_scores = {k: float(debrief_scores[k]) for k in SCORE_DIMENSIONS}
+
+    radar_scores = _normalize_radar_scores(overall_scores)
 
     # Build role-based transcript
     transcript = _build_transcript(turns)
@@ -89,7 +94,7 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
             )
 
     # Hiring signal — average across all 5 Japanese HR dimensions
-    avg = sum(overall_scores.get(d, 0) for d in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS)
+    avg = sum(radar_scores.get(d, 0) for d in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS)
     if avg >= 7.5:
         hiring_signal = "Strong Hire"
     elif avg >= 6.0:
@@ -101,11 +106,12 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
 
     response_payload: Dict[str, Any] = {
         "session_id": session_id,
-        "scores": overall_scores,
+        "scores": radar_scores,
         "transcript": transcript,
         "feedback": feedback,
         "hiring_signal": hiring_signal,
-        "radar_scores": overall_scores,
+        "radar_scores": radar_scores,
+        "turn_feedback": [],
     }
 
     # Attach turn-level feedback if available
@@ -171,21 +177,7 @@ def get_transcript(session_id: str) -> Dict[str, Any]:
 
 @interview_results_router.get("/{session_id}/debrief-status")
 def get_debrief_status(session_id: str) -> Dict[str, str]:
-    """
-    Poll this endpoint after interview_complete=True to know when the debrief is ready.
-    Returns:
-      {"status": "ready"}     — debrief results are stored and ready to fetch
-      {"status": "pending"}   — session exists but debrief not yet complete
-      {"status": "not_found"} — no session or turns found for this ID
-    """
     cached_results = get_interview_results(session_id)
-    if cached_results is not None:
+    if cached_results is not None and cached_results.get("status") != "processing":
         return {"status": "ready"}
-
-    # Check if session/turns exist (session may have been started but debrief not done yet)
-    turns = get_session_turns(session_id)
-    session = get_session(session_id)
-    if turns or session is not None:
-        return {"status": "pending"}
-
-    return {"status": "not_found"}
+    return {"status": "pending"}

@@ -9,7 +9,11 @@ from services.debrief_engine import generate_interview_debrief
 from services.feedback_engine import generate_full_feedback_package
 from services.llm_client import call_llm
 from services.score_dimensions import SCORE_DIMENSIONS, DEFAULT_SCORES
-from store.interview_results import get_interview_results, save_interview_results
+from store.interview_results import (
+    get_interview_results,
+    save_interview_results,
+    set_interview_results_processing,
+)
 from store.interview_turns import get_session_turns, store_interview_turn
 
 
@@ -190,14 +194,41 @@ def _fix_duplicate_question(
 
 
 def _trigger_debrief(session_id: str) -> None:
+    existing = get_interview_results(session_id)
+    if existing is not None and existing.get("status") != "processing":
+        return
+
+    # Mark processing in memory immediately so polling endpoints never observe a false "not ready" gap.
+    set_interview_results_processing(session_id)
+
+    turns = get_session_turns(session_id)
+
     try:
-        if get_interview_results(session_id) is None:
-            turns = get_session_turns(session_id)
-            debrief = generate_interview_debrief(turns)
-            feedback_package = generate_full_feedback_package(debrief)
-            save_interview_results(session_id, feedback_package)
+        debrief = generate_interview_debrief(turns)
     except Exception as exc:
-        LOGGER.warning("[DEBRIEF] Failed to generate debrief for session %s: %s", session_id, exc)
+        LOGGER.warning("[DEBRIEF] Debrief generation failed for session %s: %s", session_id, exc)
+        debrief = {
+            "overall_scores": dict(DEFAULT_SCORES),
+            "turn_evaluations": [],
+        }
+
+    try:
+        feedback_package = generate_full_feedback_package(debrief)
+    except Exception as exc:
+        LOGGER.warning("[DEBRIEF] Feedback package generation failed for session %s: %s", session_id, exc)
+        feedback_package = {
+            "overall_scores": dict(DEFAULT_SCORES),
+            "turn_feedback": [],
+            "final_report": {
+                "overall_summary": "Debrief generation fallback applied.",
+                "strengths": [],
+                "improvement_areas": [],
+                "recommended_focus": "",
+                "overall_scores": dict(DEFAULT_SCORES),
+            },
+        }
+
+    save_interview_results(session_id, feedback_package)
 
 
 def run_interview_turn(
