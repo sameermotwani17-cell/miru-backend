@@ -82,6 +82,12 @@ def _compute_hiring_signal(scores: Dict[str, float]) -> str:
 
 def _build_results_response(session_id: str) -> Dict[str, Any]:
     turns = get_session_turns(session_id)
+    LOGGER.debug(
+        "[RESULTS] session=%s turn_count=%d turns=%s",
+        session_id,
+        len(turns),
+        [{"turn_index": t.get("turn_index"), "question": t.get("question"), "answer": t.get("answer")} for t in turns],
+    )
     cached_results = get_interview_results(session_id)
     if not isinstance(cached_results, dict):
         raise KeyError("results_not_ready")

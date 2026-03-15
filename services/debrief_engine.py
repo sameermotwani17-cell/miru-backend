@@ -148,7 +148,7 @@ def generate_interview_debrief(turns: List[Dict[str, Any]]) -> Dict[str, Any]:
     for turn in turns:
         question_id = str(turn.get("question_id", ""))
         question_category = str(turn.get("question_category", ""))
-        question_text = str(turn.get("question_prompt", ""))
+        question_text = str(turn.get("question") or turn.get("question_prompt", ""))
         answer = str(turn.get("answer") or turn.get("user_answer") or "")
 
         evaluation = evaluate_answer(

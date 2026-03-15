@@ -449,6 +449,10 @@ def run_interview_turn(
     turn_index = len(existing_turns)
     max_questions_limit = _coerce_max_questions(max_questions)
 
+    # The question the user is answering now is the one stored as question_prompt on the previous turn.
+    # question_prompt always holds the next_question generated in that turn — i.e. what was asked to the user.
+    current_question = existing_turns[-1].get("question_prompt", "") if existing_turns else ""
+
     if force_complete:
         turn_number = turn_index + 1
         scores = _default_scores()
@@ -460,7 +464,7 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
-                question="",
+                question=current_question,
                 answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
@@ -495,7 +499,7 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
-                question="",
+                question=current_question,
                 answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
@@ -519,7 +523,7 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
-                question="",
+                question=current_question,
                 answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
@@ -552,7 +556,7 @@ def run_interview_turn(
                 question_id=question_id,
                 question_category="adaptive",
                 question_prompt="",
-                question="",
+                question=current_question,
                 answer=user_message,
                 interviewer_response=CLOSING_RESPONSE,
                 scores=scores,
@@ -628,7 +632,7 @@ def run_interview_turn(
             question_id=question_id,
             question_category="adaptive",
             question_prompt=next_question or "",
-            question=next_question or "",
+            question=current_question,
             answer=user_message,
             interviewer_response=interviewer_response,
             scores=scores,
