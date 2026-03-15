@@ -1,5 +1,6 @@
 import difflib
 import logging
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -13,7 +14,9 @@ from store.interview_turns import get_session_turns, store_interview_turn
 
 LOGGER = logging.getLogger(__name__)
 
-MAX_TURNS = 10
+# Safety backstop — prevents runaway sessions if timer_end_epoch is not set.
+# Primary completion signal is time-based (timer_end_epoch).
+SAFETY_MAX_TURNS = 30
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
@@ -144,6 +147,14 @@ def _build_turn_prompt(user_message: str, turn_index: int) -> str:
 _DUPLICATE_SIMILARITY_THRESHOLD = 0.6
 
 
+def _is_duplicate_question(a: str, b: str) -> bool:
+    """Return True if a and b are likely the same question (similarity > 0.8)."""
+    if not a or not b:
+        return False
+    similarity = difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    return similarity > 0.8
+
+
 def _fix_duplicate_question(
     interviewer_response: str,
     next_question: str,
@@ -203,6 +214,9 @@ def run_interview_turn(
     user_message: str,
     session_id: str = "default_session",
     cv_context: Optional[str] = None,
+    user_name: str = "",
+    target_role: str = "",
+    timer_end_epoch: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run a single MIRU interview turn.
@@ -210,19 +224,48 @@ def run_interview_turn(
     The backend is the single source of truth for conversation state.
     Transcript is always rebuilt from stored turns — never from client-sent history.
     The LLM generates interviewer_response, next_question, and scores each turn.
+
+    Completion is driven by:
+      1. timer_end_epoch (primary) — session wall-clock time has expired
+      2. LLM is_wrapping_up flag — LLM signals the interview is naturally complete
+      3. SAFETY_MAX_TURNS (backstop) — hard cap to prevent runaway sessions
     """
 
     existing_turns = get_session_turns(session_id)
     turn_index = len(existing_turns)
 
-    # Interview already complete — at or past the turn limit
-    if turn_index >= MAX_TURNS:
+    # Safety backstop — fires only if no timer is provided or timer logic fails
+    if turn_index >= SAFETY_MAX_TURNS:
         _trigger_debrief(session_id)
-        return {"interview_complete": True}
+        return {
+            "interview_complete": True,
+            "interviewer_response": "",
+            "next_question": "",
+            "scores": _default_scores(),
+        }
 
-    LOGGER.info("[INTERVIEW] session=%s turn=%s/%s", session_id, turn_index + 1, MAX_TURNS)
+    # Time-based completion (primary mechanism)
+    if timer_end_epoch is not None:
+        now_ms = int(time.time() * 1000)
+        if now_ms >= timer_end_epoch:
+            LOGGER.info(
+                "[INTERVIEW] session=%s time expired (now=%d >= end=%d), completing.",
+                session_id, now_ms, timer_end_epoch,
+            )
+            _trigger_debrief(session_id)
+            return {
+                "interview_complete": True,
+                "interviewer_response": CLOSING_RESPONSE,
+                "next_question": "",
+                "scores": _default_scores(),
+            }
+
+    LOGGER.info("[INTERVIEW] session=%s turn=%s", session_id, turn_index + 1)
 
     hr_prompt = _get_hr_prompt(company=company, language_mode=language_mode)
+
+    # Extract candidate name from cv_context if user_name not provided
+    candidate_name = user_name or "the candidate"
 
     system_prompt = build_system_prompt(
         company=company,
@@ -231,6 +274,8 @@ def run_interview_turn(
         is_demo_mode=is_demo_mode,
         hr_persona=hr_prompt,
         cv_context=cv_context,
+        user_name=candidate_name,
+        target_role=target_role,
     )
 
     # Rebuild transcript from stored turns (backend-owned state)
@@ -255,11 +300,14 @@ def run_interview_turn(
         interviewer_response, next_question
     )
 
-    # Determine if this is the final turn
-    is_last_turn = (turn_index + 1 >= MAX_TURNS) or is_wrapping_up
-    interview_complete = is_last_turn
+    # Additional guard: if fields are still near-identical (>0.8), remove next_question
+    if _is_duplicate_question(interviewer_response, next_question):
+        next_question = ""
 
-    if is_last_turn:
+    # Completion is driven by the LLM's wrapping-up signal
+    interview_complete = is_wrapping_up
+
+    if interview_complete:
         next_question = CLOSING_RESPONSE
 
     turn_number = turn_index + 1

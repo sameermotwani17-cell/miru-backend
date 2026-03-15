@@ -50,6 +50,11 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
     if cv_context:
         cv_context = str(cv_context).strip() or None
 
+    # Candidate identity and session timer — sourced from session state only
+    user_name = session_state.user_name if session_state else ""
+    target_role = session_state.target_role if session_state else ""
+    timer_end_epoch: int | None = session_state.timer_end_epoch if session_state else None
+
     # transcript_history and conversation_history from the client are intentionally ignored.
     # The backend reconstructs transcript state from stored turns (single source of truth).
 
@@ -61,4 +66,7 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
         is_demo_mode=is_demo_mode,
         user_message=user_message,
         cv_context=cv_context,
+        user_name=user_name,
+        target_role=target_role,
+        timer_end_epoch=timer_end_epoch,
     )

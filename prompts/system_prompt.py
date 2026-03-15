@@ -41,7 +41,8 @@ Target role: {target_role or "Not provided"}
 Language mode: {language_mode}
 Interview duration (minutes): {duration_mins}
 Demo mode: {"yes" if is_demo_mode else "no"}
-{cv_section}""".strip()
+{cv_section}
+Name instruction: {"If the candidate name is known, address them naturally at appropriate moments (for example: Hello " + user_name + "). Do not overuse the name." if user_name else "Candidate name is not known; do not guess or use a placeholder name."}""".strip()
 
     prompt = "\n\n".join(
         [

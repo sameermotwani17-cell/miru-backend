@@ -4,6 +4,7 @@ Tests for the MIRU adaptive interview engine.
 Run with: pytest tests/test_interview_engine.py -v
 """
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
@@ -408,19 +409,20 @@ class TestResultsEndpoint:
 
 
 # ---------------------------------------------------------------------------
-# Test 5: interview stops after MAX_TURNS
+# Test 5: time-based completion and safety backstop
 # ---------------------------------------------------------------------------
 
-class TestMaxTurns:
+class TestTimedCompletion:
 
-    def test_interview_complete_at_max_turns(self):
-        from services.interview_engine import run_interview_turn, MAX_TURNS
+    def test_time_expired_returns_interview_complete(self):
+        """When timer_end_epoch is in the past, interview_complete must be True."""
+        from services.interview_engine import run_interview_turn, CLOSING_RESPONSE
 
-        existing_turns = [{"turn_index": i, "interviewer_response": "", "user_answer": "answer"} for i in range(MAX_TURNS)]
+        past_epoch_ms = int(time.time() * 1000) - 5000  # 5 seconds ago
 
         p_res_get, p_res_save = _mock_results()
 
-        with patch("services.interview_engine.get_session_turns", return_value=existing_turns), \
+        with patch("services.interview_engine.get_session_turns", return_value=[]), \
              patch("services.interview_engine.store_interview_turn"), \
              patch("services.interview_engine.generate_interview_debrief", return_value={"overall_scores": {}, "turn_evaluations": []}), \
              patch("services.interview_engine.generate_full_feedback_package", return_value={}), \
@@ -432,26 +434,45 @@ class TestMaxTurns:
                 is_demo_mode=False,
                 user_message="One more answer.",
                 session_id="test_session_010",
+                timer_end_epoch=past_epoch_ms,
             )
 
         assert result.get("interview_complete") is True
+        assert result.get("interviewer_response") == CLOSING_RESPONSE
 
-    def test_last_turn_sets_interview_complete(self):
-        """The turn that hits MAX_TURNS should mark interview_complete = True."""
-        from services.interview_engine import run_interview_turn, MAX_TURNS, CLOSING_RESPONSE
+    def test_time_not_expired_continues_interview(self):
+        """When timer_end_epoch is in the future, interview must continue."""
+        from services.interview_engine import run_interview_turn
 
-        existing_turns = [
-            {"turn_index": i, "interviewer_response": "Good.", "user_answer": "answer"}
-            for i in range(MAX_TURNS - 1)
-        ]
+        future_epoch_ms = int(time.time() * 1000) + 600_000  # 10 minutes from now
 
-        llm_response = {**VALID_LLM_RESPONSE, "is_wrapping_up": False}
-
+        p_turns, p_store = _mock_store()
         p_res_get, p_res_save = _mock_results()
 
-        with patch("services.interview_engine.call_llm", return_value=llm_response), \
-             patch("services.interview_engine.get_session_turns", return_value=existing_turns), \
-             patch("services.interview_engine.store_interview_turn"), \
+        with _mock_llm(), p_turns, p_store, p_res_get, p_res_save:
+            result = run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=15,
+                is_demo_mode=False,
+                user_message="My answer.",
+                session_id="test_session_011",
+                timer_end_epoch=future_epoch_ms,
+            )
+
+        assert result.get("interview_complete") is False
+
+    def test_llm_wrapping_up_completes_interview(self):
+        """When LLM signals is_wrapping_up=True, interview_complete must be True."""
+        from services.interview_engine import run_interview_turn, CLOSING_RESPONSE
+
+        wrapping_up_response = {**VALID_LLM_RESPONSE, "is_wrapping_up": True}
+
+        p_turns, p_store = _mock_store()
+        p_res_get, p_res_save = _mock_results()
+
+        with patch("services.interview_engine.call_llm", return_value=wrapping_up_response), \
+             p_turns, p_store, \
              patch("services.interview_engine.generate_interview_debrief", return_value={"overall_scores": {}, "turn_evaluations": []}), \
              patch("services.interview_engine.generate_full_feedback_package", return_value={}), \
              p_res_get, p_res_save:
@@ -461,15 +482,74 @@ class TestMaxTurns:
                 duration_mins=15,
                 is_demo_mode=False,
                 user_message="Final answer.",
-                session_id="test_session_011",
+                session_id="test_session_012",
             )
 
         assert result.get("interview_complete") is True
         assert result.get("next_question") == CLOSING_RESPONSE
 
-    def test_max_turns_constant_is_10(self):
-        from services.interview_engine import MAX_TURNS
-        assert MAX_TURNS == 10
+    def test_safety_max_turns_backstop(self):
+        """When turn count reaches SAFETY_MAX_TURNS, interview must complete regardless of time."""
+        from services.interview_engine import run_interview_turn, SAFETY_MAX_TURNS
+
+        existing_turns = [
+            {"turn_index": i, "interviewer_response": "", "user_answer": "answer"}
+            for i in range(SAFETY_MAX_TURNS)
+        ]
+
+        p_res_get, p_res_save = _mock_results()
+
+        with patch("services.interview_engine.get_session_turns", return_value=existing_turns), \
+             patch("services.interview_engine.store_interview_turn"), \
+             patch("services.interview_engine.generate_interview_debrief", return_value={"overall_scores": {}, "turn_evaluations": []}), \
+             patch("services.interview_engine.generate_full_feedback_package", return_value={}), \
+             p_res_get, p_res_save:
+            result = run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=30,
+                is_demo_mode=False,
+                user_message="Still going.",
+                session_id="test_session_013",
+                timer_end_epoch=int(time.time() * 1000) + 600_000,  # timer not yet expired
+            )
+
+        assert result.get("interview_complete") is True
+
+    def test_safety_max_turns_constant(self):
+        from services.interview_engine import SAFETY_MAX_TURNS
+        assert SAFETY_MAX_TURNS == 30
+
+    def test_debrief_triggered_on_time_expiry(self):
+        """Debrief generation must be called when time expires."""
+        from services.interview_engine import run_interview_turn
+
+        past_epoch_ms = int(time.time() * 1000) - 1000
+
+        p_res_get, p_res_save = _mock_results()
+        mock_debrief = patch(
+            "services.interview_engine.generate_interview_debrief",
+            return_value={"overall_scores": {}, "turn_evaluations": []},
+        )
+        mock_feedback = patch(
+            "services.interview_engine.generate_full_feedback_package",
+            return_value={},
+        )
+
+        with patch("services.interview_engine.get_session_turns", return_value=[]), \
+             patch("services.interview_engine.store_interview_turn"), \
+             mock_debrief as m_debrief, mock_feedback, p_res_get, p_res_save:
+            run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=15,
+                is_demo_mode=False,
+                user_message="Done.",
+                session_id="test_session_014",
+                timer_end_epoch=past_epoch_ms,
+            )
+
+        m_debrief.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
