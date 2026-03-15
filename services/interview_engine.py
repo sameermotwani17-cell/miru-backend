@@ -1,6 +1,7 @@
+import difflib
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from prompts.system_prompt import build_system_prompt
 from services.debrief_engine import generate_interview_debrief
@@ -140,6 +141,49 @@ def _build_turn_prompt(user_message: str, turn_index: int) -> str:
     )
 
 
+_DUPLICATE_SIMILARITY_THRESHOLD = 0.6
+
+
+def _fix_duplicate_question(
+    interviewer_response: str,
+    next_question: str,
+) -> Tuple[str, str]:
+    """
+    Guard against the LLM embedding the question inside interviewer_response.
+
+    Rule:
+      If interviewer_response is sufficiently similar to next_question
+      (regardless of punctuation), the LLM has collapsed both fields into one.
+      In that case we:
+        - keep next_question as the canonical question
+        - clear interviewer_response so the candidate never hears it twice
+
+    We do NOT gate on a '?' because the LLM sometimes phrases the duplicate as
+    an imperative ("Please introduce yourself.") which carries no question mark
+    yet is still a duplicate of the next_question field.
+
+    The similarity check uses difflib's SequenceMatcher — fast, dependency-free,
+    and robust enough against minor paraphrasing.
+    """
+    if not interviewer_response or not next_question:
+        return interviewer_response, next_question
+
+    resp_norm = interviewer_response.lower().strip()
+    q_norm = next_question.lower().strip()
+
+    similarity = difflib.SequenceMatcher(None, resp_norm, q_norm).ratio()
+
+    if similarity >= _DUPLICATE_SIMILARITY_THRESHOLD:
+        LOGGER.debug(
+            "[INTERVIEW] Duplicate question detected (similarity=%.2f); "
+            "clearing interviewer_response to avoid double-prompt.",
+            similarity,
+        )
+        return "", next_question
+
+    return interviewer_response, next_question
+
+
 def _trigger_debrief(session_id: str) -> None:
     try:
         if get_interview_results(session_id) is None:
@@ -204,6 +248,12 @@ def run_interview_turn(
     next_question = str(llm_response.get("next_question") or "").strip()
     scores = _normalize_scores(llm_response.get("scores"))
     is_wrapping_up = bool(llm_response.get("is_wrapping_up", False))
+
+    # Guard: if the LLM embedded the question inside interviewer_response,
+    # clear interviewer_response so the candidate does not hear it twice.
+    interviewer_response, next_question = _fix_duplicate_question(
+        interviewer_response, next_question
+    )
 
     # Determine if this is the final turn
     is_last_turn = (turn_index + 1 >= MAX_TURNS) or is_wrapping_up

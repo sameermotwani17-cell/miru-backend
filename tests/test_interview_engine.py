@@ -470,3 +470,149 @@ class TestMaxTurns:
     def test_max_turns_constant_is_10(self):
         from services.interview_engine import MAX_TURNS
         assert MAX_TURNS == 10
+
+
+# ---------------------------------------------------------------------------
+# Test 6: duplicate-question guard (_fix_duplicate_question)
+# ---------------------------------------------------------------------------
+
+class TestFixDuplicateQuestion:
+    """Unit tests for the post-LLM duplicate-question sanitiser."""
+
+    # ------------------------------------------------------------------
+    # Direct unit tests of the helper
+    # ------------------------------------------------------------------
+
+    def test_identical_strings_clears_response(self):
+        """Exact duplicates must clear interviewer_response."""
+        from services.interview_engine import _fix_duplicate_question
+
+        resp, q = _fix_duplicate_question(
+            "Please introduce yourself.",
+            "Please introduce yourself.",
+        )
+        assert resp == "", "interviewer_response must be cleared on duplicate"
+        assert q == "Please introduce yourself."
+
+    def test_highly_similar_strings_clears_response(self):
+        """Near-identical paraphrases above the threshold must clear interviewer_response."""
+        from services.interview_engine import _fix_duplicate_question
+
+        resp, q = _fix_duplicate_question(
+            "Could you introduce yourself?",
+            "Could you please introduce yourself?",
+        )
+        assert resp == "", "Similar question in response must be cleared"
+        assert "introduce yourself" in q.lower()
+
+    def test_no_question_mark_in_response_leaves_unchanged(self):
+        """If interviewer_response has no '?', nothing should change."""
+        from services.interview_engine import _fix_duplicate_question
+
+        original_resp = "Hello Sameer, it's great to meet you today."
+        original_q = "Could you introduce yourself and walk me through your background?"
+
+        resp, q = _fix_duplicate_question(original_resp, original_q)
+
+        assert resp == original_resp
+        assert q == original_q
+
+    def test_unrelated_question_in_response_leaves_unchanged(self):
+        """A '?' in response that is unrelated to next_question must not be cleared."""
+        from services.interview_engine import _fix_duplicate_question
+
+        resp = "You mentioned working at a startup — that sounds exciting, right?"
+        q = "Can you describe a time you had to meet a tight deadline?"
+
+        result_resp, result_q = _fix_duplicate_question(resp, q)
+
+        assert result_resp == resp, "Unrelated response must not be cleared"
+        assert result_q == q
+
+    def test_empty_next_question_leaves_response_unchanged(self):
+        """When next_question is empty, response must not be touched."""
+        from services.interview_engine import _fix_duplicate_question
+
+        resp = "Please introduce yourself?"
+        resp_out, q_out = _fix_duplicate_question(resp, "")
+
+        assert resp_out == resp
+        assert q_out == ""
+
+    def test_empty_both_fields_no_error(self):
+        """Both fields empty must return both empty without raising."""
+        from services.interview_engine import _fix_duplicate_question
+
+        resp, q = _fix_duplicate_question("", "")
+        assert resp == ""
+        assert q == ""
+
+    # ------------------------------------------------------------------
+    # Integration tests via run_interview_turn
+    # ------------------------------------------------------------------
+
+    def test_run_turn_clears_duplicate_response(self):
+        """run_interview_turn must strip a duplicate question from interviewer_response."""
+        from services.interview_engine import run_interview_turn
+
+        duplicate_llm_response = {
+            "interviewer_response": "Please introduce yourself.",
+            "next_question": "Please introduce yourself.",
+            "scores": {
+                "communication": 5,
+                "clarity": 5,
+                "cultural_fit": 5,
+                "problem_solving": 5,
+            },
+            "is_wrapping_up": False,
+        }
+
+        p_turns, p_store = _mock_store(existing_turns=[])
+        p_res_get, p_res_save = _mock_results()
+
+        with _mock_llm(response=duplicate_llm_response), p_turns, p_store, p_res_get, p_res_save:
+            result = run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=15,
+                is_demo_mode=False,
+                user_message="Hi, I am Sameer.",
+                session_id="test_session_dup_01",
+            )
+
+        assert result["interviewer_response"] == "", (
+            "interviewer_response must be cleared when it duplicates next_question"
+        )
+        assert result["next_question"] == "Please introduce yourself."
+
+    def test_run_turn_preserves_clean_response(self):
+        """run_interview_turn must NOT alter a well-formed, non-duplicate response."""
+        from services.interview_engine import run_interview_turn
+
+        clean_llm_response = {
+            "interviewer_response": "Hello Sameer, it's great to meet you today.",
+            "next_question": "Could you walk me through your professional background?",
+            "scores": {
+                "communication": 7,
+                "clarity": 6,
+                "cultural_fit": 5,
+                "problem_solving": 6,
+            },
+            "is_wrapping_up": False,
+        }
+
+        p_turns, p_store = _mock_store(existing_turns=[])
+        p_res_get, p_res_save = _mock_results()
+
+        with _mock_llm(response=clean_llm_response), p_turns, p_store, p_res_get, p_res_save:
+            result = run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=15,
+                is_demo_mode=False,
+                user_message="Hi, I am Sameer.",
+                session_id="test_session_dup_02",
+            )
+
+        assert result["interviewer_response"] == "Hello Sameer, it's great to meet you today."
+        assert result["next_question"] == "Could you walk me through your professional background?"
