@@ -73,7 +73,7 @@ def store_interview_turn(
     question_id: str,
     question_category: str,
     question_prompt: str,
-    user_answer: str,
+    answer: str,
     scores: dict,
     interviewer_response: str = "",
     question: str = "",
@@ -96,7 +96,7 @@ def store_interview_turn(
         question_id=str(question_id),
         question_category=str(question_category),
         question_prompt=str(question_prompt),
-        user_answer=str(user_answer),
+        user_answer=str(answer),
         wa_teamwork=int(score_dict.get("wa_teamwork", 5)),
         loyalty_commitment=int(score_dict.get("loyalty_commitment", 5)),
         humility=int(score_dict.get("humility", 5)),
@@ -116,7 +116,6 @@ def store_interview_turn(
             "question_prompt": turn.question_prompt,
             "interviewer_response": str(interviewer_response),
             "question": str(question or question_prompt),
-            "user_answer": turn.user_answer,
             "answer": turn.user_answer,
             "score": float(score),
             "feedback": str(feedback or ""),
@@ -157,7 +156,7 @@ def get_session_turns(session_id: str) -> List[Dict[str, Any]]:
         if not isinstance(turn, dict):
             continue
         question_prompt = str(turn.get("question_prompt") or turn.get("question_text") or "")
-        user_answer = str(turn.get("user_answer") or turn.get("answer") or "")
+        answer = str(turn.get("answer") or turn.get("user_answer") or "")
         scores = turn.get("scores", {})
         if not isinstance(scores, dict):
             scores = {}
@@ -170,8 +169,9 @@ def get_session_turns(session_id: str) -> List[Dict[str, Any]]:
                 "question": str(turn.get("question") or question_prompt),
                 "question_prompt": question_prompt,
                 "interviewer_response": str(turn.get("interviewer_response", "")),
-                "user_answer": user_answer,
-                "answer": user_answer,
+                "answer": answer,
+                # Compatibility alias for older call sites still expecting user_answer.
+                "user_answer": answer,
                 "score": float(turn.get("score", 5.0) or 5.0),
                 "feedback": str(turn.get("feedback", "")),
                 "better_example": str(turn.get("better_example", "")),
