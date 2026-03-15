@@ -161,6 +161,18 @@ def get_results_by_query(session_id: str = Query(..., description="Session ID"))
         return JSONResponse(status_code=404, content={"status": "results_not_ready"})
 
 
+# ── lightweight status check: GET /api/interview/status?session_id=... ─────
+@interview_results_router.get("/status")
+def get_results_status(session_id: str = Query(..., description="Session ID")) -> Dict[str, str]:
+    """Return ready/processing without building the full response payload."""
+    results = get_interview_results(session_id)
+    if results and results.get("status") == "ready":
+        return {"status": "ready"}
+    if results:
+        return {"status": "processing"}
+    return {"status": "processing"}
+
+
 # ── path-param aliases for backward compatibility ──────────────────────────
 @interview_results_router.get("/{session_id}/results")
 def get_results(session_id: str) -> Dict[str, Any]:

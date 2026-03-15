@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -8,8 +9,10 @@ LOGGER = logging.getLogger(__name__)
 
 _results_store: Dict[str, Dict[str, Any]] = {}
 
-_BASE_DIR = Path(__file__).resolve().parents[1]
-_RESULTS_DIR = _BASE_DIR / "data" / "results"
+# Use RESULTS_DIR env var when set (e.g. Railway persistent volume at /app/data/results).
+# Falls back to /app/data/results so the container default is also predictable.
+_RESULTS_DIR = Path(os.getenv("RESULTS_DIR", "/app/data/results"))
+_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def set_interview_results_processing(session_id: str) -> None:
@@ -22,7 +25,6 @@ def save_interview_results(session_id: str, results: Dict[str, Any]) -> None:
     payload = dict(results)
 
     try:
-        _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         file_path = _RESULTS_DIR / f"{sid}.json"
         with file_path.open("w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
