@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from openai import OpenAI
 
-from services.score_dimensions import SCORE_DIMENSIONS
+from services.score_dimensions import SCORE_DIMENSIONS, DEFAULT_SCORES
 
 
 LOGGER = logging.getLogger(__name__)
@@ -141,7 +141,8 @@ def evaluate_answer(
         return dict(_DEFAULT_EVALUATION)
 
 
-def generate_interview_debrief(turns: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _evaluate_turns(turns: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Evaluate a list of interview turns and return raw debrief scores."""
     dimension_buckets: Dict[str, List[float]] = defaultdict(list)
     turn_evaluations: List[Dict[str, Any]] = []
 
@@ -182,3 +183,136 @@ def generate_interview_debrief(turns: List[Dict[str, Any]]) -> Dict[str, Any]:
         "overall_scores": overall_scores,
         "turn_evaluations": turn_evaluations,
     }
+
+
+def _calculate_hiring_signal(scores: Dict[str, Any]) -> str:
+    avg = sum(float(scores.get(d, 0)) for d in SCORE_DIMENSIONS) / len(SCORE_DIMENSIONS)
+    if avg >= 7.5:
+        return "Strong Hire"
+    if avg >= 6:
+        return "Hire"
+    if avg >= 4.5:
+        return "Borderline"
+    return "No Hire"
+
+
+def generate_interview_debrief(session_id: str) -> None:
+    """
+    Generate a full interview debrief for a session and persist the results.
+
+    Fetches stored turns, evaluates them, builds a feedback package, and
+    calls save_interview_results so the /api/interview/results endpoint can
+    return them. Safe to call multiple times — skips if results already ready.
+    """
+    # Local imports to avoid circular dependencies at module load time.
+    from store.interview_turns import get_session_turns
+    from store.interview_results import (
+        get_interview_results,
+        save_interview_results,
+        set_interview_results_processing,
+    )
+    from services.feedback_engine import generate_full_feedback_package
+
+    existing = get_interview_results(session_id)
+    if existing is not None and existing.get("status") == "ready":
+        LOGGER.debug("[DEBRIEF] Results already ready for session %s, skipping.", session_id)
+        return
+
+    set_interview_results_processing(session_id)
+    turns = get_session_turns(session_id)
+
+    # Build transcript text from stored turns for deterministic, context-aware debrief.
+    transcript_lines = []
+    for t in turns:
+        q = t.get("question_prompt", "") or t.get("question", "")
+        a = t.get("user_answer", "") or t.get("answer", "")
+        if q and a:
+            transcript_lines.append(f"Interviewer: {q}")
+            transcript_lines.append(f"Candidate: {a}")
+
+    LOGGER.info("Debrief transcript lines: %d", len(transcript_lines))
+
+    if len(transcript_lines) < 2:
+        LOGGER.warning("[DEBRIEF] Transcript empty for session %s – using fallback evaluation.", session_id)
+
+    transcript_text = "\n".join(transcript_lines)
+
+    try:
+        debrief = _evaluate_turns(turns)
+    except Exception as exc:
+        LOGGER.error("[DEBRIEF] Turn evaluation failed for session %s: %s", session_id, exc)
+        debrief = {
+            "overall_scores": dict(DEFAULT_SCORES),
+            "turn_evaluations": [],
+        }
+
+    try:
+        feedback_package = generate_full_feedback_package(debrief, transcript_text=transcript_text)
+    except Exception as exc:
+        LOGGER.warning("[DEBRIEF] Feedback package failed for session %s: %s", session_id, exc)
+        feedback_package = {
+            "overall_scores": dict(DEFAULT_SCORES),
+            "turn_feedback": [],
+            "transcript": [],
+            "hiring_signal": "Evaluation incomplete",
+            "final_report": {
+                "overall_summary": "Debrief generation fallback applied.",
+                "strengths": [],
+                "improvement_areas": [],
+                "recommended_focus": "",
+                "overall_scores": dict(DEFAULT_SCORES),
+            },
+        }
+
+    normalized_scores = {
+        dim: float(feedback_package.get("overall_scores", {}).get(dim, DEFAULT_SCORES[dim]))
+        for dim in SCORE_DIMENSIONS
+    }
+    feedback_package["overall_scores"] = normalized_scores
+    feedback_package.setdefault("turn_feedback", [])
+    feedback_package.setdefault("hiring_signal", _calculate_hiring_signal(normalized_scores))
+
+    final_report = feedback_package.get("final_report", {})
+    if not isinstance(final_report, dict):
+        final_report = {}
+
+    turn_feedback = feedback_package.get("turn_feedback", [])
+    feedback_by_qid: Dict[str, Dict[str, Any]] = {}
+    for item in turn_feedback:
+        if isinstance(item, dict):
+            qid = str(item.get("question_id", "")).strip()
+            if qid:
+                feedback_by_qid[qid] = item
+
+    transcript = []
+    for turn in turns:
+        qid = str(turn.get("question_id", "")).strip()
+        coaching = feedback_by_qid.get(qid, {})
+        transcript.append({
+            "question": str(turn.get("question") or turn.get("question_prompt") or ""),
+            "answer": str(turn.get("user_answer") or turn.get("answer") or ""),
+            "score": float(turn.get("score", 5.0) or 5.0),
+            "feedback": str(turn.get("feedback") or coaching.get("feedback") or ""),
+            "better_example": str(turn.get("better_example") or coaching.get("rewrite_example") or ""),
+        })
+
+    results = {
+        "status": "ready",
+        "session_id": session_id,
+        "overall_scores": normalized_scores,
+        "scores": normalized_scores,
+        "radar_scores": normalized_scores,
+        "transcript": transcript,
+        "turn_feedback": turn_feedback,
+        "hiring_signal": feedback_package.get("hiring_signal", _calculate_hiring_signal(normalized_scores)),
+        "final_report": final_report,
+        "feedback": {
+            "summary": str(final_report.get("overall_summary", "")),
+            "strengths": final_report.get("strengths", []),
+            "areas_for_improvement": final_report.get("improvement_areas", []),
+        },
+    }
+
+    save_interview_results(session_id, results)
+    LOGGER.info("[DEBRIEF] Results saved for session %s", session_id)
+    LOGGER.info("Debrief generated for session %s", session_id)

@@ -89,13 +89,13 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         [{"turn_index": t.get("turn_index"), "question": t.get("question"), "answer": t.get("answer")} for t in turns],
     )
     cached_results = get_interview_results(session_id)
-    if not isinstance(cached_results, dict):
+    if not isinstance(cached_results, dict) or not cached_results:
         raise KeyError("results_not_ready")
 
-    if cached_results.get("status") == "processing":
-        raise KeyError("results_not_ready")
-
-    if not cached_results:
+    # Return immediately if results exist; debrief now runs synchronously so
+    # "processing" state should be very transient (race on early retry only).
+    # Only block when there are genuinely no results yet.
+    if cached_results.get("status") == "processing" and not cached_results.get("overall_scores"):
         raise KeyError("results_not_ready")
 
     overall_scores = normalize_scores(cached_results.get("overall_scores", {}))

@@ -8,12 +8,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from prompts.system_prompt import build_system_prompt
 from services.debrief_engine import generate_interview_debrief
-from services.feedback_engine import generate_full_feedback_package
 from services.llm_client import call_llm
 from services.score_dimensions import SCORE_DIMENSIONS, DEFAULT_SCORES
 from store.interview_results import (
     get_interview_results,
-    save_interview_results,
     set_interview_results_processing,
 )
 from store.interview_turns import get_session_turns, store_interview_turn
@@ -354,91 +352,14 @@ def _call_llm_with_timeout(
 
 
 def _trigger_debrief(session_id: str) -> None:
+    """Trigger debrief generation for a session. Safe to call multiple times."""
     existing = get_interview_results(session_id)
-    if existing is not None and existing.get("status") != "processing":
+    if existing is not None and existing.get("status") == "ready":
         return
-
-    # Mark processing in memory immediately so polling endpoints never observe a false "not ready" gap.
-    set_interview_results_processing(session_id)
-
-    turns = get_session_turns(session_id)
-    used_debrief_fallback = False
-
     try:
-        debrief = generate_interview_debrief(turns)
+        generate_interview_debrief(session_id)
     except Exception as exc:
-        LOGGER.error("Debrief generation failed: %s", exc)
-        used_debrief_fallback = True
-        debrief = {
-            "overall_scores": dict(DEFAULT_SCORES),
-            "turn_feedback": [],
-            "hiring_signal": "Evaluation incomplete",
-        }
-
-    if used_debrief_fallback:
-        feedback_package = {
-            "overall_scores": dict(DEFAULT_SCORES),
-            "turn_feedback": [],
-            "transcript": [],
-            "hiring_signal": "Evaluation incomplete",
-            "final_report": {
-                "overall_summary": "Debrief generation fallback applied.",
-                "strengths": [],
-                "improvement_areas": [],
-                "recommended_focus": "",
-                "overall_scores": dict(DEFAULT_SCORES),
-            },
-        }
-    else:
-        try:
-            feedback_package = generate_full_feedback_package(debrief)
-        except Exception as exc:
-            LOGGER.warning("[DEBRIEF] Feedback package generation failed for session %s: %s", session_id, exc)
-            feedback_package = {
-                "overall_scores": dict(DEFAULT_SCORES),
-                "turn_feedback": [],
-                "transcript": [],
-                "hiring_signal": "Evaluation incomplete",
-                "final_report": {
-                    "overall_summary": "Debrief generation fallback applied.",
-                    "strengths": [],
-                    "improvement_areas": [],
-                    "recommended_focus": "",
-                    "overall_scores": dict(DEFAULT_SCORES),
-                },
-            }
-
-    normalized_scores = {
-        dim: float(feedback_package.get("overall_scores", {}).get(dim, DEFAULT_SCORES[dim]))
-        for dim in SCORE_DIMENSIONS
-    }
-    feedback_package["overall_scores"] = normalized_scores
-    feedback_package.setdefault("turn_feedback", [])
-    feedback_package.setdefault("hiring_signal", _calculate_hiring_signal(normalized_scores))
-
-    transcript = _build_qa_transcript(turns, feedback_package.get("turn_feedback", []))
-    final_report = feedback_package.get("final_report", {})
-    if not isinstance(final_report, dict):
-        final_report = {}
-
-    persisted_results = {
-        "status": "ready",
-        "session_id": session_id,
-        "overall_scores": normalized_scores,
-        "scores": normalized_scores,
-        "radar_scores": normalized_scores,
-        "transcript": transcript,
-        "turn_feedback": feedback_package.get("turn_feedback", []),
-        "hiring_signal": feedback_package.get("hiring_signal", _calculate_hiring_signal(normalized_scores)),
-        "final_report": final_report,
-        "feedback": {
-            "summary": str(final_report.get("overall_summary", "")),
-            "strengths": final_report.get("strengths", []),
-            "areas_for_improvement": final_report.get("improvement_areas", []),
-        },
-    }
-
-    save_interview_results(session_id, persisted_results)
+        LOGGER.exception("[DEBRIEF] _trigger_debrief failed for session %s: %s", session_id, exc)
 
 
 def run_interview_turn(
@@ -467,8 +388,8 @@ def run_interview_turn(
       2. LLM is_wrapping_up flag — LLM signals the interview is naturally complete
       3. SAFETY_MAX_TURNS (backstop) — hard cap to prevent runaway sessions
 
-    Debrief is NOT triggered inline. The caller (api/interview_routes.py) is
-    responsible for scheduling _trigger_debrief via BackgroundTasks.
+    Debrief is triggered inline when interview_complete is True, and also
+    scheduled as a BackgroundTask by api/interview_routes.py as a fallback.
     """
 
     existing_turns = get_session_turns(session_id)
@@ -652,6 +573,7 @@ def run_interview_turn(
     interview_complete = is_wrapping_up
 
     if interview_complete:
+        LOGGER.info("Interview complete for session %s", session_id)
         interviewer_response = CLOSING_RESPONSE
         next_question = None
         set_interview_results_processing(session_id)
@@ -676,6 +598,14 @@ def run_interview_turn(
         )
     except Exception as exc:
         LOGGER.warning("[INTERVIEW] Failed to persist turn: %s", exc)
+
+    if interview_complete:
+        try:
+            from services.debrief_engine import generate_interview_debrief
+            LOGGER.info("Generating interview debrief for session %s", session_id)
+            generate_interview_debrief(session_id)
+        except Exception as exc:
+            LOGGER.exception("Debrief generation failed for session %s", session_id)
 
     return {
         "next_question": next_question,

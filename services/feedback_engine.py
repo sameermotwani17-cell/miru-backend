@@ -130,7 +130,7 @@ def generate_turn_feedback_batch(turn_evaluations: List[Dict[str, Any]]) -> Dict
         return _fallback_turn_feedback(turn_evaluations)
 
 
-def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Dict[str, Any]]) -> Dict[str, Any]:
+def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Dict[str, Any]], transcript_text: str = "") -> Dict[str, Any]:
     LOGGER.debug("[FEEDBACK] Generating final report")
 
     if not _API_KEY:
@@ -157,6 +157,7 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
         + json.dumps(overall_scores, ensure_ascii=False)
         + "\n\nKey feedback:\n"
         + json.dumps(turn_feedback, ensure_ascii=False)
+        + (f"\n\nFull interview transcript:\n{transcript_text}" if transcript_text else "")
     )
 
     try:
@@ -221,14 +222,14 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
         return _fallback_final_report(overall_scores)
 
 
-def generate_full_feedback_package(debrief_result: Dict[str, Any]) -> Dict[str, Any]:
+def generate_full_feedback_package(debrief_result: Dict[str, Any], transcript_text: str = "") -> Dict[str, Any]:
     turn_evaluations = list(debrief_result.get("turn_evaluations", []))
     overall_scores = dict(debrief_result.get("overall_scores", {}))
 
     batch_feedback_result = generate_turn_feedback_batch(turn_evaluations)
     turn_feedback = list(batch_feedback_result.get("turn_feedback", []))
 
-    final_report = generate_final_report(overall_scores, turn_feedback)
+    final_report = generate_final_report(overall_scores, turn_feedback, transcript_text=transcript_text)
 
     return {
         "turn_feedback": turn_feedback,
