@@ -486,7 +486,8 @@ class TestTimedCompletion:
             )
 
         assert result.get("interview_complete") is True
-        assert result.get("next_question") == CLOSING_RESPONSE
+        assert result.get("interviewer_response") == CLOSING_RESPONSE
+        assert result.get("next_question") == ""
 
     def test_safety_max_turns_backstop(self):
         """When turn count reaches SAFETY_MAX_TURNS, interview must complete regardless of time."""

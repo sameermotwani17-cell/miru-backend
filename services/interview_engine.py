@@ -308,7 +308,8 @@ def run_interview_turn(
     interview_complete = is_wrapping_up
 
     if interview_complete:
-        next_question = CLOSING_RESPONSE
+        interviewer_response = CLOSING_RESPONSE
+        next_question = ""
 
     turn_number = turn_index + 1
     question_id = f"Q_LLM_{turn_number:02d}"
