@@ -43,6 +43,13 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
     except (TypeError, ValueError):
         duration_mins = 15
 
+    max_questions = payload.get("max_questions")
+    if max_questions is not None:
+        try:
+            max_questions = int(max_questions)
+        except (TypeError, ValueError):
+            max_questions = None
+
     is_demo_mode = bool(payload.get("is_demo_mode", False))
 
     # CV context — from session only (never trust client-sent CV)
@@ -69,6 +76,7 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
         user_name=user_name,
         target_role=target_role,
         timer_end_epoch=timer_end_epoch,
+        max_questions=max_questions,
     )
 
     if result.get("interview_complete"):

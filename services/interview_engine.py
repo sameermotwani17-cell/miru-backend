@@ -1,6 +1,7 @@
 import difflib
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -22,16 +23,70 @@ LOGGER = logging.getLogger(__name__)
 # Safety backstop — prevents runaway sessions if timer_end_epoch is not set.
 # Primary completion signal is time-based (timer_end_epoch).
 SAFETY_MAX_TURNS = 30
+DEFAULT_MAX_QUESTIONS = 12
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
 
 _SUPPORTED_COMPANIES = ("rakuten", "toyota", "softbank", "sony", "uniqlo")
 
-CLOSING_RESPONSE = (
-    "Thank you for your time today. It has been a pleasure speaking with you. "
-    "This concludes our interview. Please wait for your assessment."
-)
+CLOSING_RESPONSE = "Thank you for completing the interview."
+
+
+def _parse_iso_timestamp_to_ms(timestamp: str) -> Optional[int]:
+    text = str(timestamp or "").strip()
+    if not text:
+        return None
+    try:
+        # Stored timestamps use UTC with trailing Z.
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return int(dt.timestamp() * 1000)
+    except ValueError:
+        return None
+
+
+def _coerce_max_questions(max_questions: Optional[int]) -> int:
+    try:
+        value = int(max_questions) if max_questions is not None else DEFAULT_MAX_QUESTIONS
+    except (TypeError, ValueError):
+        value = DEFAULT_MAX_QUESTIONS
+    return max(1, min(SAFETY_MAX_TURNS, value))
+
+
+def _elapsed_time_reached(
+    duration_mins: int,
+    existing_turns: List[Dict[str, Any]],
+    timer_end_epoch: Optional[int],
+) -> bool:
+    now_ms = int(time.time() * 1000)
+
+    # Primary mechanism: trusted timer from session state.
+    if timer_end_epoch is not None:
+        return now_ms >= int(timer_end_epoch)
+
+    # Fallback mechanism: derive elapsed wall-clock from first stored turn timestamp.
+    if duration_mins <= 0 or not existing_turns:
+        return False
+
+    first_turn_ts = _parse_iso_timestamp_to_ms(existing_turns[0].get("timestamp", ""))
+    if first_turn_ts is None:
+        return False
+
+    elapsed_ms = now_ms - first_turn_ts
+    return elapsed_ms >= int(duration_mins) * 60 * 1000
+
+
+def _finalize_interview_response(session_id: str, turn_number: int, scores: Dict[str, int]) -> Dict[str, Any]:
+    return {
+        "interview_complete": True,
+        "interviewer_response": CLOSING_RESPONSE,
+        "next_question": None,
+        "scores": scores,
+        "question_id": f"Q_LLM_{turn_number:02d}",
+        "is_wrapping_up": True,
+        "session_id": session_id,
+        "turn": turn_number,
+    }
 
 
 def _load_prompt_text(file_path: Path) -> Optional[str]:
@@ -265,10 +320,31 @@ def _trigger_debrief(session_id: str) -> None:
     }
     feedback_package["overall_scores"] = normalized_scores
     feedback_package.setdefault("turn_feedback", [])
-    feedback_package.setdefault("transcript", [])
     feedback_package.setdefault("hiring_signal", _calculate_hiring_signal(normalized_scores))
 
-    save_interview_results(session_id, feedback_package)
+    transcript = _rebuild_transcript(turns)
+    final_report = feedback_package.get("final_report", {})
+    if not isinstance(final_report, dict):
+        final_report = {}
+
+    persisted_results = {
+        "status": "ready",
+        "session_id": session_id,
+        "overall_scores": normalized_scores,
+        "scores": normalized_scores,
+        "radar_scores": normalized_scores,
+        "transcript": transcript,
+        "turn_feedback": feedback_package.get("turn_feedback", []),
+        "hiring_signal": feedback_package.get("hiring_signal", _calculate_hiring_signal(normalized_scores)),
+        "final_report": final_report,
+        "feedback": {
+            "summary": str(final_report.get("overall_summary", "")),
+            "strengths": final_report.get("strengths", []),
+            "areas_for_improvement": final_report.get("improvement_areas", []),
+        },
+    }
+
+    save_interview_results(session_id, persisted_results)
 
 
 def run_interview_turn(
@@ -282,6 +358,7 @@ def run_interview_turn(
     user_name: str = "",
     target_role: str = "",
     timer_end_epoch: Optional[int] = None,
+    max_questions: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run a single MIRU interview turn.
@@ -301,30 +378,64 @@ def run_interview_turn(
 
     existing_turns = get_session_turns(session_id)
     turn_index = len(existing_turns)
+    max_questions_limit = _coerce_max_questions(max_questions)
+
+    existing_results = get_interview_results(session_id)
+    if isinstance(existing_results, dict) and existing_results.get("status") in {"processing", "ready"}:
+        return _finalize_interview_response(
+            session_id=session_id,
+            turn_number=max(turn_index, 1),
+            scores=_default_scores(),
+        )
+
+    # Max-questions completion gate (deterministic and LLM-independent).
+    if turn_index + 1 >= max_questions_limit:
+        turn_number = turn_index + 1
+        scores = _default_scores()
+        question_id = f"Q_LLM_{turn_number:02d}"
+        try:
+            store_interview_turn(
+                session_id=session_id,
+                turn_index=turn_number,
+                question_id=question_id,
+                question_category="adaptive",
+                question_prompt="",
+                user_answer=user_message,
+                interviewer_response=CLOSING_RESPONSE,
+                scores=scores,
+            )
+        except Exception as exc:
+            LOGGER.warning("[INTERVIEW] Failed to persist completion turn: %s", exc)
+        return _finalize_interview_response(session_id=session_id, turn_number=turn_number, scores=scores)
 
     # Safety backstop — fires only if no timer is provided or timer logic fails
     if turn_index >= SAFETY_MAX_TURNS:
-        return {
-            "interview_complete": True,
-            "interviewer_response": "",
-            "next_question": "",
-            "scores": _default_scores(),
-        }
+        return _finalize_interview_response(
+            session_id=session_id,
+            turn_number=turn_index,
+            scores=_default_scores(),
+        )
 
     # Time-based completion (primary mechanism)
-    if timer_end_epoch is not None:
-        now_ms = int(time.time() * 1000)
-        if now_ms >= timer_end_epoch:
-            LOGGER.info(
-                "[INTERVIEW] session=%s time expired (now=%d >= end=%d), completing.",
-                session_id, now_ms, timer_end_epoch,
+    if _elapsed_time_reached(duration_mins=duration_mins, existing_turns=existing_turns, timer_end_epoch=timer_end_epoch):
+        LOGGER.info("[INTERVIEW] session=%s elapsed time reached, completing.", session_id)
+        turn_number = turn_index + 1
+        scores = _default_scores()
+        question_id = f"Q_LLM_{turn_number:02d}"
+        try:
+            store_interview_turn(
+                session_id=session_id,
+                turn_index=turn_number,
+                question_id=question_id,
+                question_category="adaptive",
+                question_prompt="",
+                user_answer=user_message,
+                interviewer_response=CLOSING_RESPONSE,
+                scores=scores,
             )
-            return {
-                "interview_complete": True,
-                "interviewer_response": CLOSING_RESPONSE,
-                "next_question": "",
-                "scores": _default_scores(),
-            }
+        except Exception as exc:
+            LOGGER.warning("[INTERVIEW] Failed to persist completion turn: %s", exc)
+        return _finalize_interview_response(session_id=session_id, turn_number=turn_number, scores=scores)
 
     LOGGER.info("[INTERVIEW] session=%s turn=%s", session_id, turn_index + 1)
 
@@ -375,7 +486,7 @@ def run_interview_turn(
 
     if interview_complete:
         interviewer_response = CLOSING_RESPONSE
-        next_question = ""
+        next_question = None
 
     turn_number = turn_index + 1
     question_id = f"Q_LLM_{turn_number:02d}"
@@ -386,7 +497,7 @@ def run_interview_turn(
             turn_index=turn_number,
             question_id=question_id,
             question_category="adaptive",
-            question_prompt=next_question,
+            question_prompt=next_question or "",
             user_answer=user_message,
             interviewer_response=interviewer_response,
             scores=scores,

@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
 
 from services.analytics_engine import get_radar_chart_data
 from services.score_dimensions import DEFAULT_SCORES, SCORE_DIMENSIONS
@@ -71,45 +72,53 @@ def _compute_hiring_signal(scores: Dict[str, float]) -> str:
 
 
 def _build_results_response(session_id: str) -> Dict[str, Any]:
-    turns = get_session_turns(session_id)
-    cached_results = get_interview_results(session_id) or {}
+    cached_results = get_interview_results(session_id)
+    if not isinstance(cached_results, dict):
+        raise KeyError("results_not_ready")
 
-    # Aggregate scores from stored turn data
-    overall_scores = _aggregate_scores_from_turns(turns)
+    if cached_results.get("status") == "processing":
+        raise KeyError("results_not_ready")
 
-    # Override with debrief scores if available (more accurate)
-    if isinstance(cached_results.get("overall_scores"), dict):
-        debrief_scores = cached_results["overall_scores"]
-        if all(k in debrief_scores for k in SCORE_DIMENSIONS):
-            overall_scores = {k: float(debrief_scores[k]) for k in SCORE_DIMENSIONS}
+    if not cached_results:
+        raise KeyError("results_not_ready")
 
-    radar_scores = normalize_scores(overall_scores)
+    overall_scores = normalize_scores(cached_results.get("overall_scores", {}))
+    radar_scores = normalize_scores(cached_results.get("radar_scores", overall_scores))
 
-    # Build role-based transcript
-    transcript = cached_results.get("transcript", _build_transcript(turns))
+    transcript = cached_results.get("transcript", [])
     if not isinstance(transcript, list):
         transcript = []
 
-    # Build feedback block
     feedback: Dict[str, Any] = {
         "strengths": "",
         "areas_for_improvement": "",
         "summary": "",
     }
-    final_report = cached_results.get("final_report", {})
-    if isinstance(final_report, dict):
-        feedback["summary"] = str(final_report.get("overall_summary", ""))
-        feedback["strengths"] = _format_list_as_string(final_report.get("strengths", []))
+
+    if isinstance(cached_results.get("feedback"), dict):
+        cached_feedback = cached_results["feedback"]
+        feedback["summary"] = str(cached_feedback.get("summary", ""))
+        feedback["strengths"] = _format_list_as_string(cached_feedback.get("strengths", []))
         feedback["areas_for_improvement"] = _format_list_as_string(
-            final_report.get("improvement_areas", [])
+            cached_feedback.get("areas_for_improvement", [])
         )
 
-    if cached_results.get("hiring_signal"):
-        hiring_signal = str(cached_results.get("hiring_signal"))
-    elif cached_results.get("status") == "processing" or (not turns and not cached_results):
-        hiring_signal = "Pending"
-    else:
-        hiring_signal = _compute_hiring_signal(radar_scores)
+    final_report = cached_results.get("final_report", {})
+    if isinstance(final_report, dict):
+        if not feedback["summary"]:
+            feedback["summary"] = str(final_report.get("overall_summary", ""))
+        if not feedback["strengths"]:
+            feedback["strengths"] = _format_list_as_string(final_report.get("strengths", []))
+        if not feedback["areas_for_improvement"]:
+            feedback["areas_for_improvement"] = _format_list_as_string(
+                final_report.get("improvement_areas", [])
+            )
+
+    hiring_signal = str(
+        cached_results.get("hiring_signal")
+        or _compute_hiring_signal(radar_scores)
+    )
+
     turn_feedback = cached_results.get("turn_feedback", [])
     if not isinstance(turn_feedback, list):
         turn_feedback = []
@@ -131,18 +140,27 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
 @interview_results_router.get("/results")
 def get_results_by_query(session_id: str = Query(..., description="Session ID")) -> Dict[str, Any]:
     LOGGER.info("[API] Fetch interview results session_id=%s", session_id)
-    return _build_results_response(session_id)
+    try:
+        return _build_results_response(session_id)
+    except KeyError:
+        return JSONResponse(status_code=404, content={"status": "results_not_ready"})
 
 
 # ── path-param aliases for backward compatibility ──────────────────────────
 @interview_results_router.get("/{session_id}/results")
 def get_results(session_id: str) -> Dict[str, Any]:
-    return _build_results_response(session_id)
+    try:
+        return _build_results_response(session_id)
+    except KeyError:
+        return JSONResponse(status_code=404, content={"status": "results_not_ready"})
 
 
 @interview_results_router.get("/results/{session_id}")
 def get_results_compat(session_id: str) -> Dict[str, Any]:
-    return _build_results_response(session_id)
+    try:
+        return _build_results_response(session_id)
+    except KeyError:
+        return JSONResponse(status_code=404, content={"status": "results_not_ready"})
 
 
 @interview_results_router.get("/{session_id}/radar")
@@ -185,7 +203,11 @@ def get_transcript(session_id: str) -> Dict[str, Any]:
 def get_debrief_status(session_id: str) -> Dict[str, str]:
     cached_results = get_interview_results(session_id)
     if isinstance(cached_results, dict):
+        if cached_results.get("status") == "processing":
+            return {"status": "generating"}
         turn_feedback = cached_results.get("turn_feedback", [])
         if isinstance(turn_feedback, list) and len(turn_feedback) > 0:
             return {"status": "ready"}
-    return {"status": "pending"}
+        if cached_results.get("status") == "ready":
+            return {"status": "ready"}
+    return {"status": "generating"}

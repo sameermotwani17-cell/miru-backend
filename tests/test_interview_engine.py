@@ -370,22 +370,22 @@ class TestResultsEndpoint:
     def test_results_transcript_has_roles(self):
         from api.interview_results import _build_results_response
 
-        mock_turns = [
-            {
-                "turn_index": 1,
-                "question_id": "Q_LLM_01",
-                "question_category": "adaptive",
-                "question_prompt": "Tell me about yourself.",
-                "interviewer_response": "Welcome to the interview.",
-                "user_answer": "I am Sameer.",
-                "answer": "I am Sameer.",
-                "scores": {"wa_teamwork": 6, "loyalty_commitment": 6, "humility": 5, "kaizen_growth": 5, "cultural_fit": 5},
-                "timestamp": "2026-01-01T00:00:00Z",
-            }
-        ]
+        mock_results = {
+            "status": "ready",
+            "overall_scores": {"wa_teamwork": 6, "loyalty_commitment": 6, "humility": 5, "kaizen_growth": 5, "cultural_fit": 5},
+            "transcript": [
+                {"role": "assistant", "content": "Welcome to the interview."},
+                {"role": "user", "content": "I am Sameer."},
+            ],
+            "final_report": {
+                "overall_summary": "Solid baseline.",
+                "strengths": ["Communicates clearly"],
+                "improvement_areas": ["More concrete examples"],
+            },
+            "turn_feedback": [],
+        }
 
-        with patch("api.interview_results.get_session_turns", return_value=mock_turns), \
-             patch("api.interview_results.get_interview_results", return_value=None):
+        with patch("api.interview_results.get_interview_results", return_value=mock_results):
             response = _build_results_response("test_session_009")
 
         transcript = response["transcript"]
@@ -401,12 +401,9 @@ class TestResultsEndpoint:
     def test_missing_session_returns_error(self):
         from api.interview_results import _build_results_response
 
-        with patch("api.interview_results.get_session_turns", return_value=[]), \
-             patch("api.interview_results.get_interview_results", return_value=None):
-            response = _build_results_response("nonexistent_session")
-
-        assert "error" in response
-        assert "not found" in response["error"].lower()
+        with patch("api.interview_results.get_interview_results", return_value=None):
+            with pytest.raises(KeyError):
+                _build_results_response("nonexistent_session")
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +485,34 @@ class TestTimedCompletion:
 
         assert result.get("interview_complete") is True
         assert result.get("interviewer_response") == CLOSING_RESPONSE
-        assert result.get("next_question") == ""
+        assert result.get("next_question") is None
+
+    def test_max_questions_reached_completes_without_llm(self):
+        from services.interview_engine import run_interview_turn
+
+        existing_turns = [
+            {"turn_index": 1, "interviewer_response": "Q1", "user_answer": "A1", "timestamp": "2026-01-01T00:00:00Z"}
+        ]
+
+        p_res_get, p_res_save = _mock_results()
+
+        with patch("services.interview_engine.get_session_turns", return_value=existing_turns), \
+             patch("services.interview_engine.store_interview_turn"), \
+             patch("services.interview_engine.call_llm") as mock_llm, \
+             p_res_get, p_res_save:
+            result = run_interview_turn(
+                company="rakuten",
+                language_mode="en",
+                duration_mins=15,
+                is_demo_mode=False,
+                user_message="Second answer.",
+                session_id="test_session_012b",
+                max_questions=2,
+            )
+
+        assert result.get("interview_complete") is True
+        assert result.get("next_question") is None
+        mock_llm.assert_not_called()
 
     def test_safety_max_turns_backstop(self):
         """When turn count reaches SAFETY_MAX_TURNS, interview must complete regardless of time."""
