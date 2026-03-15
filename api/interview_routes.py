@@ -15,10 +15,12 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
     if not session_id:
         raise HTTPException(status_code=422, detail="session_id is required")
 
+    force_complete = bool(payload.get("force_complete", False))
+
     # Accept user_answer or user_message
     user_message = payload.get("user_answer") or payload.get("user_message") or payload.get("answer")
     user_message = str(user_message or "").strip()
-    if not user_message:
+    if not user_message and not force_complete:
         raise HTTPException(status_code=422, detail="user_answer is required")
 
     session_state = get_session(session_id)
@@ -77,6 +79,7 @@ async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTa
         target_role=target_role,
         timer_end_epoch=timer_end_epoch,
         max_questions=max_questions,
+        force_complete=force_complete,
     )
 
     if result.get("interview_complete"):

@@ -23,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 # Safety backstop — prevents runaway sessions if timer_end_epoch is not set.
 # Primary completion signal is time-based (timer_end_epoch).
 SAFETY_MAX_TURNS = 30
+MAX_TURNS = 10
 DEFAULT_MAX_QUESTIONS = 12
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -30,7 +31,7 @@ INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
 
 _SUPPORTED_COMPANIES = ("rakuten", "toyota", "softbank", "sony", "uniqlo")
 
-CLOSING_RESPONSE = "Thank you for completing the interview."
+CLOSING_RESPONSE = "Thank you for your time today. That concludes the interview."
 
 
 def _parse_iso_timestamp_to_ms(timestamp: str) -> Optional[int]:
@@ -359,6 +360,7 @@ def run_interview_turn(
     target_role: str = "",
     timer_end_epoch: Optional[int] = None,
     max_questions: Optional[int] = None,
+    force_complete: bool = False,
 ) -> Dict[str, Any]:
     """
     Run a single MIRU interview turn.
@@ -380,6 +382,28 @@ def run_interview_turn(
     turn_index = len(existing_turns)
     max_questions_limit = _coerce_max_questions(max_questions)
 
+    if force_complete:
+        turn_number = turn_index + 1
+        scores = _default_scores()
+        question_id = f"Q_LLM_{turn_number:02d}"
+        try:
+            store_interview_turn(
+                session_id=session_id,
+                turn_index=turn_number,
+                question_id=question_id,
+                question_category="adaptive",
+                question_prompt="",
+                user_answer=user_message,
+                interviewer_response=CLOSING_RESPONSE,
+                scores=scores,
+            )
+        except Exception as exc:
+            LOGGER.warning("[INTERVIEW] Failed to persist force-complete turn: %s", exc)
+        # Persist processing state immediately so result polling can observe completion in progress.
+        set_interview_results_processing(session_id)
+        return _finalize_interview_response(session_id=session_id, turn_number=turn_number, scores=scores)
+
+    # Hard stop once completion/debrief is already in-flight or ready.
     existing_results = get_interview_results(session_id)
     if isinstance(existing_results, dict) and existing_results.get("status") in {"processing", "ready"}:
         return _finalize_interview_response(
@@ -387,6 +411,26 @@ def run_interview_turn(
             turn_number=max(turn_index, 1),
             scores=_default_scores(),
         )
+
+    # Additional hard cap to prevent runaway loops if timer/front-end flow fails.
+    if turn_index >= MAX_TURNS:
+        turn_number = turn_index + 1
+        scores = _default_scores()
+        question_id = f"Q_LLM_{turn_number:02d}"
+        try:
+            store_interview_turn(
+                session_id=session_id,
+                turn_index=turn_number,
+                question_id=question_id,
+                question_category="adaptive",
+                question_prompt="",
+                user_answer=user_message,
+                interviewer_response=CLOSING_RESPONSE,
+                scores=scores,
+            )
+        except Exception as exc:
+            LOGGER.warning("[INTERVIEW] Failed to persist max-turn completion turn: %s", exc)
+        return _finalize_interview_response(session_id=session_id, turn_number=turn_number, scores=scores)
 
     # Max-questions completion gate (deterministic and LLM-independent).
     if turn_index + 1 >= max_questions_limit:
