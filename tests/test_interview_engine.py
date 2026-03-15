@@ -370,13 +370,21 @@ class TestResultsEndpoint:
     def test_results_transcript_has_roles(self):
         from api.interview_results import _build_results_response
 
+        mock_turns = [
+            {
+                "turn_index": 1,
+                "question_id": "Q_LLM_01",
+                "question_category": "adaptive",
+                "question_prompt": "Tell me about yourself.",
+                "user_answer": "I am Sameer.",
+                "scores": {"wa_teamwork": 6, "loyalty_commitment": 6, "humility": 5, "kaizen_growth": 5, "cultural_fit": 5},
+                "timestamp": "2026-01-01T00:00:00Z",
+            }
+        ]
+
         mock_results = {
             "status": "ready",
             "overall_scores": {"wa_teamwork": 6, "loyalty_commitment": 6, "humility": 5, "kaizen_growth": 5, "cultural_fit": 5},
-            "transcript": [
-                {"role": "assistant", "content": "Welcome to the interview."},
-                {"role": "user", "content": "I am Sameer."},
-            ],
             "final_report": {
                 "overall_summary": "Solid baseline.",
                 "strengths": ["Communicates clearly"],
@@ -385,18 +393,18 @@ class TestResultsEndpoint:
             "turn_feedback": [],
         }
 
-        with patch("api.interview_results.get_interview_results", return_value=mock_results):
+        with patch("api.interview_results.get_session_turns", return_value=mock_turns), \
+             patch("api.interview_results.get_interview_results", return_value=mock_results):
             response = _build_results_response("test_session_009")
 
         transcript = response["transcript"]
         assert isinstance(transcript, list)
         assert len(transcript) > 0
 
-        valid_roles = {"user", "assistant"}
-        for msg in transcript:
-            assert isinstance(msg, dict)
-            assert msg.get("role") in valid_roles
-            assert msg.get("content")
+        for item in transcript:
+            assert isinstance(item, dict)
+            assert "question" in item
+            assert "answer" in item
 
     def test_missing_session_returns_error(self):
         from api.interview_results import _build_results_response

@@ -260,6 +260,18 @@ def _calculate_hiring_signal(scores: Dict[str, Any]) -> str:
     return "No Hire"
 
 
+def _build_qa_transcript(turns: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    transcript: List[Dict[str, str]] = []
+    for turn in turns:
+        transcript.append(
+            {
+                "question": str(turn.get("question") or turn.get("question_prompt") or ""),
+                "answer": str(turn.get("user_answer") or turn.get("answer") or ""),
+            }
+        )
+    return transcript
+
+
 def _trigger_debrief(session_id: str) -> None:
     existing = get_interview_results(session_id)
     if existing is not None and existing.get("status") != "processing":
@@ -323,7 +335,7 @@ def _trigger_debrief(session_id: str) -> None:
     feedback_package.setdefault("turn_feedback", [])
     feedback_package.setdefault("hiring_signal", _calculate_hiring_signal(normalized_scores))
 
-    transcript = _rebuild_transcript(turns)
+    transcript = _build_qa_transcript(turns)
     final_report = feedback_package.get("final_report", {})
     if not isinstance(final_report, dict):
         final_report = {}

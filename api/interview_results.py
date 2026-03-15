@@ -30,19 +30,15 @@ def _aggregate_scores_from_turns(turns: List[Dict[str, Any]]) -> Dict[str, float
 
 
 def _build_transcript(turns: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    """Reconstruct role-based conversation transcript from stored turns."""
+    """Build frontend transcript rows using canonical question/answer keys."""
     transcript: List[Dict[str, str]] = []
     for turn in turns:
-        response = turn.get("interviewer_response", "")
-        question = turn.get("question_prompt", "")
-        answer = turn.get("user_answer", "") or turn.get("answer", "")
-
-        if response:
-            transcript.append({"role": "assistant", "content": response})
-        if question:
-            transcript.append({"role": "assistant", "content": question})
-        if answer:
-            transcript.append({"role": "user", "content": answer})
+        question = str(turn.get("question") or turn.get("question_prompt") or "")
+        answer = str(turn.get("user_answer") or turn.get("answer") or "")
+        transcript.append({
+            "question": question,
+            "answer": answer,
+        })
 
     return transcript
 
@@ -72,6 +68,7 @@ def _compute_hiring_signal(scores: Dict[str, float]) -> str:
 
 
 def _build_results_response(session_id: str) -> Dict[str, Any]:
+    turns = get_session_turns(session_id)
     cached_results = get_interview_results(session_id)
     if not isinstance(cached_results, dict):
         raise KeyError("results_not_ready")
@@ -85,9 +82,7 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
     overall_scores = normalize_scores(cached_results.get("overall_scores", {}))
     radar_scores = normalize_scores(cached_results.get("radar_scores", overall_scores))
 
-    transcript = cached_results.get("transcript", [])
-    if not isinstance(transcript, list):
-        transcript = []
+    transcript = _build_transcript(turns)
 
     feedback: Dict[str, Any] = {
         "strengths": "",
@@ -128,6 +123,7 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
         "scores": radar_scores,
         "transcript": transcript,
         "feedback": feedback,
+        "final_report": final_report if isinstance(final_report, dict) else {},
         "hiring_signal": hiring_signal,
         "radar_scores": radar_scores,
         "turn_feedback": turn_feedback,
