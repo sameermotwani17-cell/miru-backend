@@ -43,7 +43,7 @@ def _build_transcript(turns: List[Dict[str, Any]], turn_feedback: List[Dict[str,
     for turn in turns:
         qid = str(turn.get("question_id", "")).strip()
         coaching = feedback_by_qid.get(qid, {})
-        question = str(turn.get("question") or "")
+        question = str(turn.get("question") or turn.get("question_prompt") or "")
         answer = str(turn.get("answer") or "")
         transcript.append({
             "question": question,
@@ -105,7 +105,7 @@ def _build_results_response(session_id: str) -> Dict[str, Any]:
     if not isinstance(turn_feedback, list):
         turn_feedback = []
 
-    transcript = _build_transcript(turns, turn_feedback)
+    transcript = cached_results.get("transcript") or _build_transcript(turns, turn_feedback)
 
     feedback: Dict[str, Any] = {
         "strengths": "",

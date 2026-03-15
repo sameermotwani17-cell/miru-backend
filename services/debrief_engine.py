@@ -171,12 +171,12 @@ def generate_interview_debrief(turns: List[Dict[str, Any]]) -> Dict[str, Any]:
             dimension_buckets[dimension].append(float(evaluation[dimension]))
 
     overall_scores = {
-        dimension: round(sum(scores) / len(scores), 2) if scores else 0.0
+        dimension: round(sum(scores) / len(scores), 2) if scores else None
         for dimension, scores in dimension_buckets.items()
     }
 
     for dimension in SCORE_DIMENSIONS:
-        overall_scores.setdefault(dimension, 0.0)
+        overall_scores.setdefault(dimension, None)
 
     return {
         "overall_scores": overall_scores,

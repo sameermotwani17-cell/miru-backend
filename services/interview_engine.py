@@ -621,6 +621,7 @@ def run_interview_turn(
     if interview_complete:
         interviewer_response = CLOSING_RESPONSE
         next_question = None
+        set_interview_results_processing(session_id)
 
     turn_number = turn_index + 1
     question_id = f"Q_LLM_{turn_number:02d}"
