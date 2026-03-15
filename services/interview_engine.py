@@ -8,6 +8,7 @@ from prompts.system_prompt import build_system_prompt
 from services.debrief_engine import generate_interview_debrief
 from services.feedback_engine import generate_full_feedback_package
 from services.llm_client import call_llm
+from services.score_dimensions import SCORE_DIMENSIONS, DEFAULT_SCORES
 from store.interview_results import get_interview_results, save_interview_results
 from store.interview_turns import get_session_turns, store_interview_turn
 
@@ -22,8 +23,6 @@ PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
 INTERVIEWER_PROMPT_DIR = PROMPT_DIR / "interviewer"
 
 _SUPPORTED_COMPANIES = ("rakuten", "toyota", "softbank", "sony", "uniqlo")
-
-_SCORE_KEYS = ("communication", "clarity", "cultural_fit", "problem_solving")
 
 CLOSING_RESPONSE = (
     "Thank you for your time today. It has been a pleasure speaking with you. "
@@ -78,12 +77,7 @@ def _get_hr_prompt(company: str, language_mode: str) -> str:
 
 
 def _default_scores() -> Dict[str, int]:
-    return {
-        "communication": 5,
-        "clarity": 5,
-        "cultural_fit": 5,
-        "problem_solving": 5,
-    }
+    return dict(DEFAULT_SCORES)
 
 
 def _normalize_scores(raw_scores: Any) -> Dict[str, int]:
@@ -91,7 +85,7 @@ def _normalize_scores(raw_scores: Any) -> Dict[str, int]:
         return _default_scores()
 
     normalized: Dict[str, int] = {}
-    for key in _SCORE_KEYS:
+    for key in SCORE_DIMENSIONS:
         value = raw_scores.get(key)
         if value is None:
             return _default_scores()
@@ -229,6 +223,9 @@ def run_interview_turn(
       1. timer_end_epoch (primary) — session wall-clock time has expired
       2. LLM is_wrapping_up flag — LLM signals the interview is naturally complete
       3. SAFETY_MAX_TURNS (backstop) — hard cap to prevent runaway sessions
+
+    Debrief is NOT triggered inline. The caller (api/interview_routes.py) is
+    responsible for scheduling _trigger_debrief via BackgroundTasks.
     """
 
     existing_turns = get_session_turns(session_id)
@@ -236,7 +233,6 @@ def run_interview_turn(
 
     # Safety backstop — fires only if no timer is provided or timer logic fails
     if turn_index >= SAFETY_MAX_TURNS:
-        _trigger_debrief(session_id)
         return {
             "interview_complete": True,
             "interviewer_response": "",
@@ -252,7 +248,6 @@ def run_interview_turn(
                 "[INTERVIEW] session=%s time expired (now=%d >= end=%d), completing.",
                 session_id, now_ms, timer_end_epoch,
             )
-            _trigger_debrief(session_id)
             return {
                 "interview_complete": True,
                 "interviewer_response": CLOSING_RESPONSE,
@@ -327,9 +322,6 @@ def run_interview_turn(
         )
     except Exception as exc:
         LOGGER.warning("[INTERVIEW] Failed to persist turn: %s", exc)
-
-    if interview_complete:
-        _trigger_debrief(session_id)
 
     return {
         "next_question": next_question,

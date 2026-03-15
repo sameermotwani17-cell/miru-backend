@@ -5,6 +5,8 @@ from typing import Any, Dict, List
 
 from openai import OpenAI
 
+from services.score_dimensions import SCORE_DIMENSIONS
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -17,8 +19,8 @@ def _fallback_turn_feedback(turn_evaluations: List[Dict[str, Any]]) -> Dict[str,
         {
             "question_id": str(t.get("question_id", "")),
             "feedback": "Clear response with relevant intent.",
-            "improvement": "Add one concrete example with your personal action and outcome.",
-            "rewrite_example": "I approached the challenge methodically, collaborated with my team, and reflected on the outcome to improve future performance.",
+            "improvement": "Add one concrete example showing team-first thinking and long-term commitment to the company.",
+            "rewrite_example": "I worked closely with my team to achieve this outcome, and the experience strengthened my commitment to growing within the organisation long-term.",
         }
         for t in turn_evaluations
     ]
@@ -27,13 +29,14 @@ def _fallback_turn_feedback(turn_evaluations: List[Dict[str, Any]]) -> Dict[str,
 
 def _fallback_final_report(overall_scores: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "overall_summary": "The interview shows a solid baseline with room to strengthen evidence depth and impact clarity.",
-        "strengths": ["Clear communication", "Positive growth orientation"],
+        "overall_summary": "The interview shows a solid baseline with room to strengthen Japanese HR alignment, particularly around team-first framing and long-term commitment signals.",
+        "strengths": ["Shows willingness to contribute", "Demonstrates growth orientation"],
         "improvement_areas": [
-            "Use more measurable outcomes",
-            "Demonstrate stronger problem-solving with concrete examples",
+            "Use more team-first language (wa_teamwork)",
+            "Signal stronger long-term commitment to the company (loyalty_commitment)",
+            "Frame achievements with appropriate humility",
         ],
-        "recommended_focus": "Practice concise STAR examples that emphasize communication, clarity, and analytical thinking.",
+        "recommended_focus": "Practice framing answers around group outcomes, company loyalty, and continuous improvement within the organisation's framework.",
         "overall_scores": dict(overall_scores),
     }
 
@@ -47,13 +50,19 @@ def generate_turn_feedback_batch(turn_evaluations: List[Dict[str, Any]]) -> Dict
     client = OpenAI(api_key=_API_KEY)
 
     system_prompt = (
-        "You are MIRU, an AI interview coach.\n"
-        "For each interview answer provide:\n"
-        "1. Feedback (what was good)\n"
-        "2. One improvement suggestion\n"
-        "3. A stronger rewritten version of the answer\n\n"
-        "The rewritten answer should demonstrate clear communication, structured thinking, "
-        "cultural alignment, and problem-solving ability.\n"
+        "You are MIRU, an AI interview coach specialising in Japanese corporate HR evaluation.\n"
+        "For each interview answer provide coaching feedback based on these five Japanese HR dimensions:\n"
+        "- wa_teamwork (協調性): group harmony, team-first language\n"
+        "- loyalty_commitment (忠誠心): long-term commitment signals\n"
+        "- humility (謙虚さ): appropriate modesty, credit to team\n"
+        "- kaizen_growth (成長意欲): growth framed within company framework\n"
+        "- cultural_fit (文化適合): Japanese business etiquette awareness\n\n"
+        "For each answer provide:\n"
+        "1. Feedback (what signals were good for Japanese HR)\n"
+        "2. One improvement suggestion referencing specific Japanese HR dimensions\n"
+        "3. A stronger rewritten version of the answer that scores higher on these dimensions\n\n"
+        "The rewritten answer should demonstrate team-first thinking, appropriate humility, "
+        "long-term commitment, growth within the company framework, and cultural awareness.\n"
         "Return ONLY JSON."
     )
 
@@ -130,8 +139,15 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
     client = OpenAI(api_key=_API_KEY)
 
     system_prompt = (
-        "You are MIRU, an AI interview preparation assistant.\n"
+        "You are MIRU, an AI interview preparation assistant specialising in Japanese corporate HR.\n"
         "Based on the interview results, generate a structured interview report.\n"
+        "The five scoring dimensions are Japanese HR criteria:\n"
+        "- wa_teamwork (協調性): group harmony, team-first language\n"
+        "- loyalty_commitment (忠誠心): long-term commitment signals\n"
+        "- humility (謙虚さ): appropriate modesty\n"
+        "- kaizen_growth (成長意欲): growth within company framework\n"
+        "- cultural_fit (文化適合): Japanese business etiquette\n"
+        "Frame all feedback in terms of these dimensions.\n"
         "Return ONLY JSON."
     )
 
@@ -168,12 +184,19 @@ def generate_final_report(overall_scores: Dict[str, Any], turn_feedback: List[Di
                                 "type": "object",
                                 "additionalProperties": False,
                                 "properties": {
-                                    "communication": {"type": "number"},
-                                    "clarity": {"type": "number"},
+                                    "wa_teamwork": {"type": "number"},
+                                    "loyalty_commitment": {"type": "number"},
+                                    "humility": {"type": "number"},
+                                    "kaizen_growth": {"type": "number"},
                                     "cultural_fit": {"type": "number"},
-                                    "problem_solving": {"type": "number"},
                                 },
-                                "required": ["communication", "clarity", "cultural_fit", "problem_solving"],
+                                "required": [
+                                    "wa_teamwork",
+                                    "loyalty_commitment",
+                                    "humility",
+                                    "kaizen_growth",
+                                    "cultural_fit",
+                                ],
                             },
                         },
                         "required": [

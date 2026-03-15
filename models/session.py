@@ -18,10 +18,11 @@ class SessionState:
 
     running_scores: Dict[str, float] = field(
         default_factory=lambda: {
-            "communication": 0.0,
-            "clarity": 0.0,
+            "wa_teamwork": 0.0,
+            "loyalty_commitment": 0.0,
+            "humility": 0.0,
+            "kaizen_growth": 0.0,
             "cultural_fit": 0.0,
-            "problem_solving": 0.0,
         }
     )
 

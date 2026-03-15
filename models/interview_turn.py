@@ -9,8 +9,9 @@ class InterviewTurn:
     question_category: str
     question_prompt: str
     user_answer: str
-    communication: int
-    clarity: int
+    wa_teamwork: int
+    loyalty_commitment: int
+    humility: int
+    kaizen_growth: int
     cultural_fit: int
-    problem_solving: int
     timestamp: str

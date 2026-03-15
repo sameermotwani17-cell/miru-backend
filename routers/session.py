@@ -1,6 +1,6 @@
 import time
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ class StartSessionRequest(BaseModel):
     company: str
     language_mode: str
     duration_mins: int
+    cv_context: Optional[str] = None
 
 
 @router.post("/start")
@@ -34,6 +35,7 @@ def start_session(payload: StartSessionRequest) -> Dict[str, Any]:
         language_mode=payload.language_mode,
         duration_mins=payload.duration_mins,
         timer_end_epoch=timer_end_epoch,
+        cv_context=payload.cv_context,
     )
 
     create_session(state)
@@ -64,4 +66,3 @@ def get_session_state(session_id: str) -> Dict[str, Any]:
 def delete_session_endpoint(session_id: str) -> Dict[str, bool]:
     delete_session(session_id)
     return {"ok": True}
-

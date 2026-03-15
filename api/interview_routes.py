@@ -1,8 +1,8 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from services.interview_engine import run_interview_turn
+from services.interview_engine import run_interview_turn, _trigger_debrief
 from store.sessions import get_session
 
 
@@ -10,7 +10,7 @@ interview_router = APIRouter(prefix="/api", tags=["interview"])
 
 
 @interview_router.post("/interview/turn")
-async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
+async def interview_turn(payload: Dict[str, Any], background_tasks: BackgroundTasks) -> Dict[str, Any]:
     session_id = str(payload.get("session_id") or "").strip()
     if not session_id:
         raise HTTPException(status_code=422, detail="session_id is required")
@@ -58,7 +58,7 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
     # transcript_history and conversation_history from the client are intentionally ignored.
     # The backend reconstructs transcript state from stored turns (single source of truth).
 
-    return run_interview_turn(
+    result = run_interview_turn(
         session_id=session_id,
         company=company,
         language_mode=language_mode,
@@ -70,3 +70,8 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
         target_role=target_role,
         timer_end_epoch=timer_end_epoch,
     )
+
+    if result.get("interview_complete"):
+        background_tasks.add_task(_trigger_debrief, session_id)
+
+    return result

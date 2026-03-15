@@ -22,10 +22,11 @@ VALID_LLM_RESPONSE = {
     "interviewer_response": "Thank you for that introduction.",
     "next_question": "Could you tell me about a time you faced a difficult challenge?",
     "scores": {
-        "communication": 7,
-        "clarity": 6,
+        "wa_teamwork": 7,
+        "loyalty_commitment": 6,
+        "humility": 5,
+        "kaizen_growth": 6,
         "cultural_fit": 5,
-        "problem_solving": 6,
     },
     "is_wrapping_up": False,
 }
@@ -96,7 +97,7 @@ class TestRunInterviewTurnStructure:
 
         scores = result["scores"]
         assert isinstance(scores, dict)
-        for dim in ("communication", "clarity", "cultural_fit", "problem_solving"):
+        for dim in ("wa_teamwork", "loyalty_commitment", "humility", "kaizen_growth", "cultural_fit"):
             assert dim in scores, f"Missing score dimension: {dim}"
             assert 1 <= scores[dim] <= 10, f"Score out of range for {dim}: {scores[dim]}"
 
@@ -333,18 +334,18 @@ class TestResultsEndpoint:
                 "interviewer_response": "Hello, welcome to the interview.",
                 "user_answer": "I am a software engineer.",
                 "answer": "I am a software engineer.",
-                "scores": {"communication": 7, "clarity": 6, "cultural_fit": 5, "problem_solving": 6},
+                "scores": {"wa_teamwork": 7, "loyalty_commitment": 6, "humility": 5, "kaizen_growth": 6, "cultural_fit": 5},
                 "timestamp": "2026-01-01T00:00:00Z",
             }
         ]
 
         mock_results = {
-            "overall_scores": {"communication": 7.0, "clarity": 6.0, "cultural_fit": 5.0, "problem_solving": 6.0},
+            "overall_scores": {"wa_teamwork": 7.0, "loyalty_commitment": 6.0, "humility": 5.0, "kaizen_growth": 6.0, "cultural_fit": 5.0},
             "final_report": {
                 "overall_summary": "Good candidate.",
-                "strengths": ["Clear communication"],
-                "improvement_areas": ["Needs more concrete examples"],
-                "recommended_focus": "Practice STAR method.",
+                "strengths": ["Shows team-first thinking"],
+                "improvement_areas": ["Needs stronger loyalty signals"],
+                "recommended_focus": "Practice framing answers around group outcomes.",
             },
             "turn_feedback": [],
         }
@@ -358,7 +359,7 @@ class TestResultsEndpoint:
         assert "feedback" in response
 
         scores = response["scores"]
-        for dim in ("communication", "clarity", "cultural_fit", "problem_solving"):
+        for dim in ("wa_teamwork", "loyalty_commitment", "humility", "kaizen_growth", "cultural_fit"):
             assert dim in scores
 
         feedback = response["feedback"]
@@ -378,7 +379,7 @@ class TestResultsEndpoint:
                 "interviewer_response": "Welcome to the interview.",
                 "user_answer": "I am Sameer.",
                 "answer": "I am Sameer.",
-                "scores": {"communication": 6, "clarity": 6, "cultural_fit": 5, "problem_solving": 5},
+                "scores": {"wa_teamwork": 6, "loyalty_commitment": 6, "humility": 5, "kaizen_growth": 5, "cultural_fit": 5},
                 "timestamp": "2026-01-01T00:00:00Z",
             }
         ]
@@ -522,12 +523,11 @@ class TestTimedCompletion:
         assert SAFETY_MAX_TURNS == 30
 
     def test_debrief_triggered_on_time_expiry(self):
-        """Debrief generation must be called when time expires."""
-        from services.interview_engine import run_interview_turn
+        """When time expires, run_interview_turn returns interview_complete=True.
+        Debrief is scheduled asynchronously by the route handler via BackgroundTasks;
+        this test verifies _trigger_debrief calls generate_interview_debrief when invoked."""
+        from services.interview_engine import _trigger_debrief
 
-        past_epoch_ms = int(time.time() * 1000) - 1000
-
-        p_res_get, p_res_save = _mock_results()
         mock_debrief = patch(
             "services.interview_engine.generate_interview_debrief",
             return_value={"overall_scores": {}, "turn_evaluations": []},
@@ -537,18 +537,11 @@ class TestTimedCompletion:
             return_value={},
         )
 
-        with patch("services.interview_engine.get_session_turns", return_value=[]), \
-             patch("services.interview_engine.store_interview_turn"), \
-             mock_debrief as m_debrief, mock_feedback, p_res_get, p_res_save:
-            run_interview_turn(
-                company="rakuten",
-                language_mode="en",
-                duration_mins=15,
-                is_demo_mode=False,
-                user_message="Done.",
-                session_id="test_session_014",
-                timer_end_epoch=past_epoch_ms,
-            )
+        with patch("services.interview_engine.get_session_turns", return_value=[{"question_id": "Q1", "question_category": "adaptive", "question_prompt": "Intro?", "user_answer": "Hello"}]), \
+             patch("services.interview_engine.get_interview_results", return_value=None), \
+             patch("services.interview_engine.save_interview_results"), \
+             mock_debrief as m_debrief, mock_feedback:
+            _trigger_debrief("test_session_014")
 
         m_debrief.assert_called_once()
 
@@ -640,10 +633,11 @@ class TestFixDuplicateQuestion:
             "interviewer_response": "Please introduce yourself.",
             "next_question": "Please introduce yourself.",
             "scores": {
-                "communication": 5,
-                "clarity": 5,
+                "wa_teamwork": 5,
+                "loyalty_commitment": 5,
+                "humility": 5,
+                "kaizen_growth": 5,
                 "cultural_fit": 5,
-                "problem_solving": 5,
             },
             "is_wrapping_up": False,
         }
@@ -674,10 +668,11 @@ class TestFixDuplicateQuestion:
             "interviewer_response": "Hello Sameer, it's great to meet you today.",
             "next_question": "Could you walk me through your professional background?",
             "scores": {
-                "communication": 7,
-                "clarity": 6,
+                "wa_teamwork": 7,
+                "loyalty_commitment": 6,
+                "humility": 5,
+                "kaizen_growth": 6,
                 "cultural_fit": 5,
-                "problem_solving": 6,
             },
             "is_wrapping_up": False,
         }

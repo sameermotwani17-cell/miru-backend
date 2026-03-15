@@ -85,10 +85,11 @@ def store_interview_turn(
         question_category=str(question_category),
         question_prompt=str(question_prompt),
         user_answer=str(user_answer),
-        communication=int(score_dict.get("communication", 5)),
-        clarity=int(score_dict.get("clarity", 5)),
+        wa_teamwork=int(score_dict.get("wa_teamwork", 5)),
+        loyalty_commitment=int(score_dict.get("loyalty_commitment", 5)),
+        humility=int(score_dict.get("humility", 5)),
+        kaizen_growth=int(score_dict.get("kaizen_growth", 5)),
         cultural_fit=int(score_dict.get("cultural_fit", 5)),
-        problem_solving=int(score_dict.get("problem_solving", 5)),
         timestamp=_iso_now(),
     )
 
@@ -105,10 +106,11 @@ def store_interview_turn(
             "user_answer": turn.user_answer,
             "answer": turn.user_answer,
             "scores": {
-                "communication": turn.communication,
-                "clarity": turn.clarity,
+                "wa_teamwork": turn.wa_teamwork,
+                "loyalty_commitment": turn.loyalty_commitment,
+                "humility": turn.humility,
+                "kaizen_growth": turn.kaizen_growth,
                 "cultural_fit": turn.cultural_fit,
-                "problem_solving": turn.problem_solving,
             },
             "timestamp": turn.timestamp,
         }
@@ -154,10 +156,11 @@ def get_session_turns(session_id: str) -> List[Dict[str, Any]]:
                 "user_answer": user_answer,
                 "answer": user_answer,
                 "scores": {
-                    "communication": int(scores.get("communication", 5)),
-                    "clarity": int(scores.get("clarity", 5)),
+                    "wa_teamwork": int(scores.get("wa_teamwork", 5)),
+                    "loyalty_commitment": int(scores.get("loyalty_commitment", 5)),
+                    "humility": int(scores.get("humility", 5)),
+                    "kaizen_growth": int(scores.get("kaizen_growth", 5)),
                     "cultural_fit": int(scores.get("cultural_fit", 5)),
-                    "problem_solving": int(scores.get("problem_solving", 5)),
                 },
                 "timestamp": str(turn.get("timestamp", "")),
             }

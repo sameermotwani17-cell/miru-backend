@@ -2,6 +2,8 @@ import json
 import os
 from openai import OpenAI
 
+from services.score_dimensions import DEFAULT_SCORES
+
 
 def _get_client() -> OpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
@@ -50,12 +52,22 @@ def call_llm(system_prompt: str, conversation: list, user_message: str):
                             "type": "object",
                             "additionalProperties": False,
                             "properties": {
-                                "communication": {
+                                "wa_teamwork": {
                                     "type": "integer",
                                     "minimum": 1,
                                     "maximum": 10
                                 },
-                                "clarity": {
+                                "loyalty_commitment": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 10
+                                },
+                                "humility": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 10
+                                },
+                                "kaizen_growth": {
                                     "type": "integer",
                                     "minimum": 1,
                                     "maximum": 10
@@ -64,18 +76,14 @@ def call_llm(system_prompt: str, conversation: list, user_message: str):
                                     "type": "integer",
                                     "minimum": 1,
                                     "maximum": 10
-                                },
-                                "problem_solving": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 10
                                 }
                             },
                             "required": [
-                                "communication",
-                                "clarity",
-                                "cultural_fit",
-                                "problem_solving"
+                                "wa_teamwork",
+                                "loyalty_commitment",
+                                "humility",
+                                "kaizen_growth",
+                                "cultural_fit"
                             ]
                         },
                         "is_wrapping_up": {
@@ -102,11 +110,6 @@ def call_llm(system_prompt: str, conversation: list, user_message: str):
         return {
             "interviewer_response": raw_text,
             "next_question": "",
-            "scores": {
-                "communication": 5,
-                "clarity": 5,
-                "cultural_fit": 5,
-                "problem_solving": 5,
-            },
+            "scores": dict(DEFAULT_SCORES),
             "is_wrapping_up": False,
         }

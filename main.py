@@ -8,11 +8,11 @@ from routers.session import router as session_router
 
 app = FastAPI(title="MIRU Backend", version="0.1.0")
 
-# Allow all origins for now; tighten in production if needed.
+# allow_credentials must be False when allow_origins=["*"] (CORS spec requirement).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
