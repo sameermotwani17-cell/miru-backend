@@ -87,8 +87,11 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
         result.pop("voice_audio", None)
 
     # Guarantee tts_text is always present for ElevenLabs (speech generated on frontend)
+    # Include next_question so the candidate hears both the acknowledgment and the next question.
     interviewer_response = str(result.get("interviewer_response") or "")
-    result["tts_text"] = interviewer_response
-    print("TTS text:", interviewer_response)
+    next_q = str(result.get("next_question") or "")
+    tts_parts = [p for p in [interviewer_response, next_q] if p]
+    result["tts_text"] = " ".join(tts_parts)
+    print("TTS text:", result["tts_text"])
 
     return result
