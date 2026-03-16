@@ -3,6 +3,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException
 
 from services.interview_engine import run_interview_turn
+from services.voice_service import generate_voice
 from store.sessions import get_session
 
 
@@ -82,19 +83,21 @@ async def interview_turn(payload: Dict[str, Any]) -> Dict[str, Any]:
         force_complete=force_complete,
     )
 
-    voice_mode = bool(payload.get("voice_mode", False))
-    if not voice_mode:
-        result.pop("voice_audio", None)
-
-    # Guarantee tts_text is always present for ElevenLabs (speech generated on frontend)
-    # Include next_question so the candidate hears both the acknowledgment and the next question.
+    # Build tts_text: interviewer_response + next_question combined (full spoken content).
     interviewer_response = str(result.get("interviewer_response") or "")
     next_q = str(result.get("next_question") or "")
-    # Deduplicate: fallback sets both fields to the same string, avoid speaking it twice.
     tts_parts = [interviewer_response] if interviewer_response else []
     if next_q and next_q != interviewer_response:
         tts_parts.append(next_q)
-    result["tts_text"] = " ".join(tts_parts)
-    print("TTS text:", result["tts_text"])
+    tts_text = " ".join(tts_parts)
+    result["tts_text"] = tts_text
+
+    # Generate voice_audio from the full tts_text when requested.
+    # This covers both interviewer_response AND next_question in one audio clip.
+    voice_mode = bool(payload.get("voice_mode", False))
+    if voice_mode and tts_text:
+        result["voice_audio"] = generate_voice(tts_text)
+    else:
+        result.pop("voice_audio", None)
 
     return result

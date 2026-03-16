@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from prompts.system_prompt import build_system_prompt
 from services.debrief_engine import generate_interview_debrief
 from services.llm_client import call_llm
-from services.voice_service import generate_voice
 from services.score_dimensions import SCORE_DIMENSIONS, DEFAULT_SCORES
 from store.interview_results import (
     get_interview_results,
@@ -96,18 +95,10 @@ def _finalize_interview_response(session_id: str, turn_number: int, scores: Dict
     except Exception as exc:
         LOGGER.exception("[INTERVIEW] Inline debrief failed for session %s: %s", session_id, exc)
 
-    voice_audio = None
-    try:
-        from services.voice_service import generate_voice
-        voice_audio = generate_voice(CLOSING_RESPONSE)
-    except Exception as exc:
-        LOGGER.warning("[INTERVIEW] Voice generation failed in finalize: %s", exc)
-
     return {
         "interview_complete": True,
         "debrief_ready": True,
         "interviewer_response": CLOSING_RESPONSE,
-        "voice_audio": voice_audio,
         "next_question": None,
         "scores": scores,
         "question_id": f"Q_LLM_{turn_number:02d}",
@@ -625,6 +616,17 @@ def run_interview_turn(
     except Exception as exc:
         LOGGER.warning("[INTERVIEW] Failed to persist turn: %s", exc)
 
+    # Post-LLM timer check: catches cases where the timer expired during the LLM call.
+    # Without this, the turn returns interview_complete=False even though time is up,
+    # and the frontend never navigates to the debrief screen.
+    if not interview_complete and _elapsed_time_reached(
+        duration_mins=duration_mins,
+        existing_turns=existing_turns,
+        timer_end_epoch=timer_end_epoch,
+    ):
+        LOGGER.info("[INTERVIEW] session=%s timer expired during LLM call, finalizing", session_id)
+        return _finalize_interview_response(session_id=session_id, turn_number=turn_number, scores=scores)
+
     if interview_complete:
         try:
             from services.debrief_engine import generate_interview_debrief
@@ -633,12 +635,9 @@ def run_interview_turn(
         except Exception as exc:
             LOGGER.exception("Debrief generation failed for session %s", session_id)
 
-    voice_audio = generate_voice(interviewer_response)
-
     return {
         "next_question": next_question,
         "interviewer_response": interviewer_response,
-        "voice_audio": voice_audio,
         "interview_complete": interview_complete,
         "debrief_ready": interview_complete,
         "question_id": question_id,
