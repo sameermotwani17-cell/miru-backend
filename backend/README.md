@@ -519,6 +519,25 @@ DATABASE_URL=postgresql://user:pass@host:6543/postgres?sslmode=require
 > database host. Each serverless invocation can open its own connection, and
 > a direct connection will exhaust Postgres' connection limit under load.
 
+### Database schema
+
+`migrations/0001_init.sql` is the reviewable schema. The backend also creates
+these tables on first connect, so a fresh deployment self-heals, but applying
+the migration deliberately is preferred:
+
+```bash
+psql "$DATABASE_URL" -f migrations/0001_init.sql
+```
+
+Three tables: `interview_sessions` (candidate, company, CV, timer),
+`interview_turns` (the transcript history is rebuilt from), and
+`interview_results` (the debrief payload).
+
+RLS is enabled with no policies. The backend connects as `postgres`, which
+bypasses RLS, so the app is unaffected — but the `anon` role is denied
+outright, so an exposed anon key cannot read candidate CVs or transcripts
+through PostgREST.
+
 Check what the running deployment actually has:
 
 ```bash
