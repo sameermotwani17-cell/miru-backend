@@ -4,6 +4,16 @@
 -- fresh deployment self-heals. This file exists so the schema is reviewable,
 -- diffable and applied deliberately rather than as a side effect of the first
 -- request that happens to reach the database.
+--
+-- APPLIED: Supabase project `gomi-snap` (ref govvyvhfkynupdbvghna,
+-- ap-south-1). MIRU shares that project's database because the free plan
+-- caps an organization at two projects. The three tables below are the only
+-- ones MIRU touches; gomi-snap's own tables (cities, materials,
+-- waste_categories, rules, healthcheck) are untouched and unrelated.
+--
+-- Sharing means one connection pool and one storage quota across two
+-- applications. Move MIRU to its own project when the org has a free slot or
+-- moves to Pro.
 
 -- Final debrief payload per session: radar scores, transcript, coaching
 -- feedback and the final report, stored as one document.

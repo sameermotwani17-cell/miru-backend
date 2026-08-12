@@ -519,6 +519,20 @@ DATABASE_URL=postgresql://user:pass@host:6543/postgres?sslmode=require
 > database host. Each serverless invocation can open its own connection, and
 > a direct connection will exhaust Postgres' connection limit under load.
 
+The database currently lives in Supabase project `gomi-snap`
+(ref `govvyvhfkynupdbvghna`, region `ap-south-1`), shared because the free
+plan caps an organization at two projects. Copy the exact string from
+**Settings → Database → Connection pooler → Transaction mode**; it looks like:
+
+```
+postgresql://postgres.govvyvhfkynupdbvghna:<PASSWORD>@aws-0-ap-south-1.pooler.supabase.com:6543/postgres
+```
+
+**Set the backend Vercel project's function region to `bom1` (Mumbai)** to
+match `ap-south-1`. Vercel defaults to `iad1` (Washington DC); a US function
+against a Mumbai database pays roughly 200ms on every query, and the
+interview loop issues several per turn.
+
 ### Database schema
 
 `migrations/0001_init.sql` is the reviewable schema. The backend also creates

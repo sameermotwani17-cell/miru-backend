@@ -29,6 +29,10 @@ in Root Directory.
 Deploy the backend first, then set the frontend's `NEXT_PUBLIC_API_URL` to the
 backend's deployment URL.
 
+Set the **backend** project's function region to `bom1` (Mumbai) to match the
+database in `ap-south-1`. Vercel defaults to `iad1`, which puts an ocean
+between the function and its database on every query.
+
 To stop each project rebuilding when the other half changes, set an **Ignored
 Build Step** in Vercel:
 
