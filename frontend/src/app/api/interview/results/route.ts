@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_BASE =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://miru-backend-production.up.railway.app";
+// Server-side proxy. Reads the same env var as the browser client so both
+// halves target one backend; no Railway fallback (that host is retired).
+const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 export async function GET(request: NextRequest) {
   const sessionId = request.nextUrl.searchParams.get("session_id")?.trim();

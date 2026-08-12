@@ -24,12 +24,26 @@ function normalizeCompanyForBackend(company: string): string {
   return map[raw] ?? raw;
 }
 
-const BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://miru-backend-production.up.railway.app";
+// Backend base URL. Set NEXT_PUBLIC_API_URL in the Vercel project settings to
+// the backend deployment's URL (e.g. https://miru-api.vercel.app).
+//
+// There is deliberately no hardcoded fallback: the previous default pointed at
+// the retired Railway host, so a missing env var failed as an opaque CORS or
+// DNS error at runtime instead of saying what was actually wrong.
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    console.error(
+      "NEXT_PUBLIC_API_URL is not set — API calls will fail. " +
+        "Set it to the backend deployment URL in your Vercel project settings."
+    );
+  }
+  return "";
+}
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://miru-backend-production.up.railway.app";
+const BASE = resolveApiBase();
+const API_URL = BASE;
 
 class ApiError extends Error {
   constructor(
@@ -200,4 +214,12 @@ export async function getFeedback(
 
 export async function getTranscript(sessionId: string): Promise<Transcript> {
   return request<Transcript>(`/api/interview/${sessionId}/transcript`);
+}
+
+export async function textToSpeech(text: string): Promise<string> {
+  const res = await request<{ audio_base64: string }>("/api/voice/tts", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  return res.audio_base64 ?? "";
 }
