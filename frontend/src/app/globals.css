@@ -1,0 +1,347 @@
+@import "tailwindcss";
+/* design system v2 */
+:root {
+  /* ── Design system palette ──────────────────────────────── */
+  --color-primary:   #0d3a5f;   /* Primary Dark Blue */
+  --color-secondary: #2883ba;   /* Secondary Blue */
+  --color-accent:    #1ca2a2;   /* Accent Teal */
+
+  /* Dark surface backgrounds (used by interview page & dark nav) */
+  --bg-void:    #050508;
+  --bg-surface: #0d0d14;
+  --bg-elevated: #13131f;
+  --bg-overlay: #1a1a2e;
+
+  /* Page background */
+  --bg-page: #faf0e0;
+
+  /* Accent / functional colors */
+  --accent-primary:   #2883ba;   /* Interactive elements, buttons */
+  --accent-secondary: #1ca2a2;   /* Teal — charts, accents */
+  --accent-warm:      #ef4444;   /* Red — errors, low scores */
+  --accent-green:     #10b981;   /* Green — high scores */
+  --accent-gold:      #f59e0b;   /* Amber — medium scores */
+
+  /* Text on dark glass cards */
+  --text-primary:   #f0f0ff;
+  --text-secondary: #8888aa;
+  --text-dim:       #44445a;
+
+  /* Text on light page background */
+  --text-page-heading: #0d3a5f;
+  --text-page-body:    #333333;
+  --text-page-muted:   #9ca3af;
+  --text-page-accent:  #2883ba;
+
+  /* Borders */
+  --border-subtle: rgba(40, 131, 186, 0.15);
+  --border-active: rgba(40, 131, 186, 0.45);
+
+  /* Glows */
+  --glow-primary: 0 0 32px rgba(40, 131, 186, 0.25);
+  --glow-blue:    0 0 32px rgba(28, 162, 162, 0.2);
+
+  /* Bokeh blob colors */
+  --bokeh-1: rgba(40, 131, 186, 0.06);
+  --bokeh-2: rgba(28, 162, 162, 0.05);
+  --bokeh-3: rgba(13, 58, 95, 0.04);
+}
+
+@theme inline {
+  --color-bg-void:        var(--bg-void);
+  --color-bg-surface:     var(--bg-surface);
+  --color-bg-elevated:    var(--bg-elevated);
+  --color-bg-overlay:     var(--bg-overlay);
+  --color-accent-primary:   var(--accent-primary);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-warm:      var(--accent-warm);
+  --color-accent-green:     var(--accent-green);
+  --color-accent-gold:      var(--accent-gold);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-dim:       var(--text-dim);
+  --font-display: var(--font-sora);
+  --font-body:    var(--font-space-grotesk);
+  --font-japanese: var(--font-noto-jp);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-body), "Space Grotesk", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Card styles ─────────────────────────────────────────── */
+
+/* Default: clean white card for light pages */
+.glass-card {
+  background: #ffffff;
+  border: 1px solid rgba(40, 131, 186, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(13, 58, 95, 0.07);
+}
+
+.glass-card-hover {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.glass-card-hover:hover {
+  border-color: rgba(40, 131, 186, 0.35);
+  box-shadow: 0 4px 24px rgba(40, 131, 186, 0.15);
+}
+
+/* ─── Page theming ────────────────────────────────────────── */
+
+/* Landing, onboarding, debrief — light background */
+.page-light {
+  --text-primary:   #0d3a5f;
+  --text-secondary: #4a6a8a;
+  --text-dim:       #8899aa;
+  --border-subtle:  rgba(40, 131, 186, 0.15);
+  --border-active:  rgba(40, 131, 186, 0.45);
+}
+
+/* Interview page — fully dark */
+.page-dark {
+  --text-primary:   #f0f0ff;
+  --text-secondary: #8888aa;
+  --text-dim:       #44445a;
+}
+
+/* Dark navbars / surfaces on light pages restore light-on-dark text */
+.page-light .dark-surface {
+  --text-primary:   #f0f4ff;
+  --text-secondary: #b0c4d8;
+  --text-dim:       #7090a8;
+  --border-subtle:  rgba(255, 255, 255, 0.1);
+  --border-active:  rgba(255, 255, 255, 0.3);
+}
+
+/* Dark interview page — frosted glass cards */
+.page-dark .glass-card {
+  background: rgba(13, 13, 20, 0.8);
+  border: 1px solid rgba(40, 131, 186, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: none;
+  border-radius: 16px;
+}
+
+/* ─── Company insight card ───────────────────────────────── */
+
+.insight-card {
+  background: rgba(13, 58, 95, 0.04);
+  border: 1px solid rgba(40, 131, 186, 0.2);
+  border-top: 3px solid #1ca2a2;
+  color: #0d3a5f;
+  border-radius: 12px;
+  padding: 18px 22px;
+  overflow: hidden;
+}
+
+.insight-label {
+  display: block;
+  color: #1ca2a2;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.insight-body {
+  color: #0d3a5f;
+  font-size: 14px;
+  line-height: 1.7;
+  font-family: var(--font-body);
+  margin: 0;
+}
+
+/* ─── Shimmer loading skeleton ───────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(40, 131, 186, 0.05) 25%,
+    rgba(40, 131, 186, 0.12) 50%,
+    rgba(40, 131, 186, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(40, 131, 186, 0.08) 25%,
+    rgba(40, 131, 186, 0.18) 50%,
+    rgba(40, 131, 186, 0.08) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 4px;
+}
+
+/* Score bar base */
+.score-bar-track {
+  background: rgba(40, 131, 186, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  height: 6px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0e8d8;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(40, 131, 186, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(40, 131, 186, 0.5);
+}
+
+/* ─── Bokeh blob drift animations ────────────────────────── */
+
+@keyframes bokeh-drift-1 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  33%  { transform: translate(40px, -30px) scale(1.08); }
+  66%  { transform: translate(-20px, 50px) scale(0.95); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes bokeh-drift-2 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  40%  { transform: translate(-50px, 30px) scale(1.12); }
+  80%  { transform: translate(30px, -40px) scale(0.92); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes bokeh-drift-3 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  30%  { transform: translate(25px, 60px) scale(1.05); }
+  70%  { transform: translate(-35px, -20px) scale(1.1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes bokeh-drift-4 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  50%  { transform: translate(-30px, -45px) scale(1.07); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes bokeh-drift-5 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  45%  { transform: translate(55px, 20px) scale(0.93); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes bokeh-drift-6 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  35%  { transform: translate(-15px, -55px) scale(1.1); }
+  65%  { transform: translate(40px, 30px) scale(0.96); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+/* ─── Print styles ────────────────────────────────────────── */
+
+.print-header {
+  display: none;
+}
+
+@media print {
+  .print-header {
+    display: block !important;
+    padding: 16px 0 12px;
+    border-bottom: 2px solid #0d3a5f;
+    margin-bottom: 24px;
+  }
+
+  .print-header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0d3a5f;
+    margin: 0 0 4px;
+  }
+
+  .print-header p {
+    font-size: 12px;
+    color: #333333;
+    margin: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0d3a5f !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  canvas {
+    display: none !important;
+  }
+
+  .particle-bg {
+    display: none !important;
+  }
+
+  .glass-card {
+    background: #f8f8fb !important;
+    border: 1px solid #d0dce8 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #0d3a5f !important;
+    box-shadow: none !important;
+  }
+
+  .score-bar-track {
+    background: #dde8f0 !important;
+  }
+
+  .radar-chart-wrapper {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  section {
+    break-inside: avoid;
+  }
+
+  a {
+    color: #2883ba;
+    text-decoration: none;
+  }
+
+  @page {
+    margin: 20mm;
+  }
+}
