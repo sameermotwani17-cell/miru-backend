@@ -1,6 +1,13 @@
 import logging
 import os
 
+# Imported first, for its side effect: config loads .env into the environment.
+# Nothing imported it before, so .env was silently ignored and the README's
+# "cp .env.example .env" step did nothing — env vars only worked if they were
+# already exported in the shell. This must stay above the imports below, since
+# those pull in modules that read configuration.
+import config  # noqa: F401
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
