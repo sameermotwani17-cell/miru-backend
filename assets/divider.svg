@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 8" width="1280" height="8" role="presentation">
+  <defs><linearGradient id="g" x1="0" x2="1" gradientUnits="objectBoundingBox">
+    <stop offset="0" stop-color="#2ec4b6" stop-opacity="0"/><stop offset=".5" stop-color="#2ec4b6"/><stop offset="1" stop-color="#6a4bff" stop-opacity="0"/>
+    <animateTransform attributeName="gradientTransform" type="translate" from="-1 0" to="1 0" dur="3.2s" repeatCount="indefinite"/></linearGradient></defs>
+  <rect y="3" width="1280" height="2" rx="1" fill="rgba(255,255,255,.08)"/><rect y="2" width="1280" height="4" rx="2" fill="url(#g)"/>
+</svg>

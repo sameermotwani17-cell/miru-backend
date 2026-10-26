@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/banner.svg" alt="MIRU 見る" width="100%" /></p>
+
 # MIRU
 
 Japanese interview simulation and cultural-fit evaluation. One repository,
@@ -91,3 +93,7 @@ reports missing secrets and an unreachable database as warnings, so a broken
 contract is distinguishable from an unconfigured environment.
 
 `GET /health` reports which dependencies a running deployment actually has.
+
+<p align="center"><img src="assets/divider.svg" alt="" width="100%" /></p>
+
+<p align="center"><sub>Built by <a href="https://github.com/sameermotwani17-cell">Sameer Motwani</a> · <a href="https://portfolio-sameermotwani17-cells-projects.vercel.app">portfolio</a></sub></p>
